@@ -21,10 +21,11 @@ WELCOME_TEXT = """Привет! Я Buxme AI-Scout.
 class MessageSender(Protocol):
     async def send_message(
         self,
-        chat_id: int,
+        recipient_id: int,
         text: str,
         *,
         attachments: list[dict[str, Any]] | None = None,
+        recipient_kind: str = "chat",
     ) -> dict[str, Any]: ...
 
 
@@ -61,6 +62,33 @@ def _extract_message_text(update: dict[str, Any]) -> str:
     return text.strip() if isinstance(text, str) else ""
 
 
+def _extract_recipient(update: dict[str, Any]) -> tuple[str, int] | None:
+    """Находит адресата для разных вариантов событий MAX."""
+
+    chat_id = update.get("chat_id")
+    if isinstance(chat_id, int) and chat_id:
+        return "chat", chat_id
+
+    message = update.get("message")
+    if not isinstance(message, dict):
+        return None
+
+    recipient = message.get("recipient")
+    if isinstance(recipient, dict):
+        nested_chat_id = recipient.get("chat_id")
+        if isinstance(nested_chat_id, int) and nested_chat_id:
+            return "chat", nested_chat_id
+
+    # В личном диалоге надёжный fallback — ID пользователя-отправителя.
+    sender = message.get("sender")
+    if isinstance(sender, dict):
+        user_id = sender.get("user_id")
+        if isinstance(user_id, int) and user_id:
+            return "user", user_id
+
+    return None
+
+
 async def handle_update(
     update: dict[str, Any],
     sender: MessageSender,
@@ -69,8 +97,8 @@ async def handle_update(
     """Обрабатывает события MAX и сообщает, было ли отправлено сообщение."""
 
     update_type = update.get("update_type")
-    chat_id = update.get("chat_id")
-    if not isinstance(chat_id, int):
+    recipient = _extract_recipient(update)
+    if recipient is None:
         return False
 
     should_greet = update_type == "bot_started"
@@ -81,9 +109,11 @@ async def handle_update(
     if not should_greet:
         return False
 
+    recipient_kind, recipient_id = recipient
     await sender.send_message(
-        chat_id,
+        recipient_id,
         WELCOME_TEXT,
         attachments=build_open_app_keyboard(settings),
+        recipient_kind=recipient_kind,
     )
     return True

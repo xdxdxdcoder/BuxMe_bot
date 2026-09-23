@@ -15,13 +15,19 @@ class FakeSender:
 
     async def send_message(
         self,
-        chat_id: int,
+        recipient_id: int,
         text: str,
         *,
         attachments: list[dict[str, Any]] | None = None,
+        recipient_kind: str = "chat",
     ) -> dict[str, Any]:
         self.messages.append(
-            {"chat_id": chat_id, "text": text, "attachments": attachments}
+            {
+                "recipient_id": recipient_id,
+                "recipient_kind": recipient_kind,
+                "text": text,
+                "attachments": attachments,
+            }
         )
         return {"message": {}}
 
@@ -43,7 +49,8 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertTrue(handled)
-        self.assertEqual(self.sender.messages[0]["chat_id"], 519)
+        self.assertEqual(self.sender.messages[0]["recipient_id"], 519)
+        self.assertEqual(self.sender.messages[0]["recipient_kind"], "chat")
         button = self.sender.messages[0]["attachments"][0]["payload"]["buttons"][0][0]
         self.assertEqual(button["type"], "open_app")
         self.assertEqual(button["web_app"], "t519_hakaton_max_bot")
@@ -52,15 +59,37 @@ class BotHandlerTests(unittest.IsolatedAsyncioTestCase):
         handled = await handle_update(
             {
                 "update_type": "message_created",
-                "chat_id": 519,
-                "message": {"body": {"text": "/help"}},
+                "message": {
+                    "recipient": {"chat_id": 519},
+                    "sender": {"user_id": 2048},
+                    "body": {"text": "/help"},
+                },
             },
             self.sender,
             self.settings,
         )
 
         self.assertTrue(handled)
+        self.assertEqual(self.sender.messages[0]["recipient_id"], 519)
         self.assertIn("Как пользоваться", self.sender.messages[0]["text"])
+
+    async def test_direct_message_falls_back_to_user_id(self) -> None:
+        handled = await handle_update(
+            {
+                "update_type": "message_created",
+                "message": {
+                    "recipient": {"chat_id": 0},
+                    "sender": {"user_id": 2048},
+                    "body": {"text": "/start"},
+                },
+            },
+            self.sender,
+            self.settings,
+        )
+
+        self.assertTrue(handled)
+        self.assertEqual(self.sender.messages[0]["recipient_id"], 2048)
+        self.assertEqual(self.sender.messages[0]["recipient_kind"], "user")
 
     async def test_unknown_message_is_ignored(self) -> None:
         handled = await handle_update(

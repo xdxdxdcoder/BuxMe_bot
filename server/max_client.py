@@ -104,12 +104,16 @@ class MaxBotClient:
 
     async def send_message(
         self,
-        chat_id: int,
+        recipient_id: int,
         text: str,
         *,
         attachments: list[dict[str, Any]] | None = None,
+        recipient_kind: str = "chat",
     ) -> dict[str, Any]:
         """Отправляет текст и необязательные вложения в диалог MAX."""
+
+        if recipient_kind not in {"chat", "user"}:
+            raise ValueError("recipient_kind должен быть chat или user")
 
         body: dict[str, Any] = {"text": text, "notify": True}
         if attachments:
@@ -118,7 +122,7 @@ class MaxBotClient:
         return await self.request(
             "POST",
             "/messages",
-            params={"chat_id": chat_id},
+            params={f"{recipient_kind}_id": recipient_id},
             json=body,
         )
 
