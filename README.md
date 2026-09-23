@@ -161,6 +161,7 @@ Backend для приветствия отделён от React-приложен
 
 - `api/max/webhook.py` — HTTPS webhook, проверяющий заголовок `X-Max-Bot-Api-Secret`;
 - `server/max_client.py` — универсальный асинхронный клиент MAX Bot API на `httpx`;
+- `server/certs/russian_trusted_root_ca.pem` — официальный корневой сертификат Минцифры с проверенным SHA-256 fingerprint;
 - `server/bot_handler.py` — обработка `bot_started`, `/start` и `/help`;
 - `server/config.py` — загрузка конфигурации через `pydantic-settings`;
 - `tests/backend/test_bot_handler.py` — unit-тесты сценариев бота.
@@ -172,6 +173,12 @@ https://bux-me-bot.vercel.app/api/max/webhook
 ```
 
 После добавления server-side переменных необходимо создать подписку MAX на события `bot_started` и `message_created` через `POST https://platform-api2.max.ru/subscriptions`. Тот же `MAX_WEBHOOK_SECRET`, который передан при создании подписки, должен храниться в Vercel.
+
+Для повторной безопасной регистрации без вывода секретов в терминал:
+
+```bash
+python scripts/register_max_webhook.py
+```
 
 ## Работа с данными
 

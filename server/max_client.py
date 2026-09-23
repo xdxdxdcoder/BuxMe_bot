@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import logging
+import ssl
+from pathlib import Path
 from typing import Any
 
+import certifi
 import httpx
 
 from server.config import Settings
 
 logger = logging.getLogger(__name__)
+
+
+def build_ssl_context() -> ssl.SSLContext:
+    """Добавляет официальный корневой сертификат Минцифры к стандартным CA."""
+
+    context = ssl.create_default_context(cafile=certifi.where())
+    certificate = Path(__file__).with_name("certs") / "russian_trusted_root_ca.pem"
+    context.load_verify_locations(cafile=str(certificate))
+    return context
 
 
 class MaxAPIError(RuntimeError):
@@ -31,6 +43,7 @@ class MaxBotClient:
                 "Accept": "application/json",
             },
             timeout=httpx.Timeout(10.0),
+            verify=build_ssl_context(),
         )
 
     async def __aenter__(self) -> "MaxBotClient":
