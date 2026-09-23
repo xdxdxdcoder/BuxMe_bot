@@ -142,11 +142,36 @@ pnpm preview
 VITE_APP_MODE=mock
 VITE_API_BASE_URL=
 VITE_MAX_BOT_USERNAME=t519_hakaton_max_bot
+
+# Только backend/server-side
+BOT_TOKEN=
+MAX_WEBHOOK_SECRET=
+MAX_API_BASE_URL=https://platform-api2.max.ru
+MAX_BOT_USERNAME=t519_hakaton_max_bot
+MINI_APP_URL=https://bux-me-bot.vercel.app/
 ```
 
-Все переменные `VITE_*` публичны и попадают в браузерный bundle. Секретный `BOT_TOKEN` нельзя добавлять во frontend ENV, исходный код или Vercel frontend environment.
+Все переменные `VITE_*` публичны и попадают в браузерный bundle. `BOT_TOKEN` и `MAX_WEBHOOK_SECRET` добавляются только в server-side Environment Variables Vercel и никогда не должны иметь префикс `VITE_`.
 
-В текущем frontend-only MVP токен не используется. `.env` добавлен в `.gitignore`, в репозитории находится только `.env.example`.
+`.env` добавлен в `.gitignore`, в репозитории находится только `.env.example` без значений секретов.
+
+## MAX-бот и приветствие
+
+Backend для приветствия отделён от React-приложения:
+
+- `api/max/webhook.py` — HTTPS webhook, проверяющий заголовок `X-Max-Bot-Api-Secret`;
+- `server/max_client.py` — универсальный асинхронный клиент MAX Bot API на `httpx`;
+- `server/bot_handler.py` — обработка `bot_started`, `/start` и `/help`;
+- `server/config.py` — загрузка конфигурации через `pydantic-settings`;
+- `tests/backend/test_bot_handler.py` — unit-тесты сценариев бота.
+
+При запуске бот отправляет краткую инструкцию и кнопку `open_app`, которая открывает привязанную Mini App. Production webhook:
+
+```text
+https://bux-me-bot.vercel.app/api/max/webhook
+```
+
+После добавления server-side переменных необходимо создать подписку MAX на события `bot_started` и `message_created` через `POST https://platform-api2.max.ru/subscriptions`. Тот же `MAX_WEBHOOK_SECRET`, который передан при создании подписки, должен храниться в Vercel.
 
 ## Работа с данными
 
@@ -180,6 +205,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+python -m unittest discover -s tests/backend
 ```
 
 ## Размещение и подключение к MAX
@@ -193,12 +219,12 @@ pnpm build
 
 ## Внешние сервисы и интеграции
 
-- Vercel — статический HTTPS-хостинг frontend;
+- Vercel — HTTPS-хостинг frontend и Python serverless webhook;
 - MAX — среда запуска после привязки организаторами;
 - MAX Bridge CDN — интеграция интерфейса с клиентом MAX;
 - Google Fonts CDN — загрузка Manrope с системным fallback.
 
-Собственного публичного API в текущей версии нет, поэтому `openapi.yaml` и `DATA-API.yaml` не требуются.
+Публичный webhook принимает только события MAX и защищён отдельным секретом. Поисковый backend AI-Scout по-прежнему не подключён.
 
 ## Известные ограничения
 
@@ -207,11 +233,11 @@ pnpm build
 - данные сохраняются только на устройстве пользователя;
 - без привязки организаторами приложение работает как обычный HTTPS-сайт, а не внутри MAX;
 - Secure MAX identity validation потребует server-side компонента в следующей версии;
-- реальный бот-токен не используется frontend-приложением.
+- реальный bot token используется только server-side webhook и не попадает во frontend bundle.
 
 ## Безопасность
 
-- рабочие токены и секреты отсутствуют в репозитории;
+- рабочие токены и секреты отсутствуют в репозитории и хранятся как sensitive variables Vercel;
 - `.env` игнорируется Git;
 - URL и внешние действия проходят через MAX Bridge adapter;
 - `initDataUnsafe` не используется как доказательство личности;
