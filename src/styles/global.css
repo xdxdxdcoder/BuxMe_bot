@@ -41,7 +41,8 @@ h1, h2, h3, p { margin-top: 0; }
 
 .brand-mark { display: flex; align-items: center; font-size: 22px; font-weight: 800; letter-spacing: .06em; }
 .brand-mark__x { color: var(--green); font-size: 1.35em; margin: 0 1px; transform: skewX(-8deg); }
-.brand-mark--compact { font-size: 17px; }
+.brand-mark--compact { flex: 0 0 auto; }
+.brand-mark__image { display: block; width: auto; height: 36px; max-width: 120px; object-fit: contain; }
 
 .button { min-height: 50px; border: 0; border-radius: 14px; padding: 0 20px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; cursor: pointer; font-weight: 750; transition: transform .16s ease, box-shadow .2s ease, background .2s ease; }
 .button:disabled { opacity: .62; cursor: wait; }
