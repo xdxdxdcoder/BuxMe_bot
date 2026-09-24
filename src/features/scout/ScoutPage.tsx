@@ -3,6 +3,7 @@ import { ArrowRight, ChevronDown, Clock3, Heart, LogOut, Search, SlidersHorizont
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../app/app-context';
 import { BrandMark } from '../../components/BrandMark';
+import { LocationAutocomplete } from '../../components/LocationAutocomplete';
 import { CompanyCard } from '../company/CompanyCard';
 import { SearchProgress } from './SearchProgress';
 import { searchCompanies } from '../../services/scout/scoutService';
@@ -90,7 +91,7 @@ export function ScoutPage() {
           <label htmlFor="region">Регион или город</label>
           <div className={`search-box__input ${error ? 'input-wrap--error' : ''}`}>
             <Search size={22} />
-            <input id="region" placeholder="Например, Краснодарский край" value={region} onChange={(event) => { setRegion(event.target.value); setError(''); }} />
+            <LocationAutocomplete value={region} onChange={(value) => { setRegion(value); setError(''); }} />
             <button className="button button--primary" type="submit">Найти компании <ArrowRight size={18} /></button>
           </div>
           {error ? <p className="field-error" role="alert">{error}</p> : null}
