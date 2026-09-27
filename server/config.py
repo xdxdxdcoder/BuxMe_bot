@@ -21,6 +21,16 @@ class Settings(BaseSettings):
         default="https://bux-me-bot.vercel.app/",
         alias="MINI_APP_URL",
     )
+    gigachat_api_key: SecretStr = Field(default=SecretStr(""), alias="GIGACHAT_API_KEY")
+    gigachat_auth_url: str = Field(
+        default="https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
+        alias="GIGACHAT_AUTH_URL",
+    )
+    gigachat_chat_url: str = Field(
+        default="https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
+        alias="GIGACHAT_CHAT_URL",
+    )
+    gigachat_scope: str = Field(default="GIGACHAT_API_PERS", alias="GIGACHAT_SCOPE")
 
     model_config = SettingsConfigDict(
         env_file=".env",

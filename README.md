@@ -137,12 +137,23 @@ pnpm build
 pnpm preview
 ```
 
+Для запуска Mini App вместе с live backend через Docker:
+
+```bash
+docker compose up --build
+```
+
+После сборки приложение доступно на `http://localhost:8080`. Frontend работает в
+`live`-режиме, а nginx проксирует `/api/scout/search` во внутренний FastAPI
+контейнер. Backend использует `GIGACHAT_API_KEY` из `.env`; перед запуском
+скопируйте `.env.example` в `.env` и заполните секреты.
+
 ## Переменные окружения
 
 Скопируйте `.env.example` в `.env`, если нужно переопределить значения:
 
 ```env
-VITE_APP_MODE=mock
+VITE_APP_MODE=live
 VITE_API_BASE_URL=
 VITE_MAX_BOT_USERNAME=t519_hakaton_max_bot
 
@@ -234,7 +245,7 @@ python -m unittest discover -s tests/backend
 - MAX Bridge CDN — интеграция интерфейса с клиентом MAX;
 - Google Fonts CDN — загрузка Manrope с системным fallback.
 
-Публичный webhook принимает только события MAX и защищён отдельным секретом. Поисковый backend AI-Scout по-прежнему не подключён.
+Публичный webhook принимает только события MAX и защищён отдельным секретом. Backend AI-Scout доступен через `POST /api/scout/search`: он получает регион, собирает компании Rusprofile, последовательно отправляет каждую карточку в GigaChat и возвращает JSON с кандидатами и AI-оценкой. Для запуска нужен `GIGACHAT_API_KEY` из `.env`; ключ не передаётся во frontend.
 
 ## Известные ограничения
 

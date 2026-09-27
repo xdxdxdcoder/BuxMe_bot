@@ -8,7 +8,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
-ENV VITE_APP_MODE=mock
+ARG VITE_APP_MODE=live
+ARG VITE_API_BASE_URL=
+ENV VITE_APP_MODE=$VITE_APP_MODE
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN pnpm build
 
 FROM nginx:1.27-alpine
