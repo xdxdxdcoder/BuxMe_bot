@@ -13,6 +13,11 @@ import type { Company } from '../../types/scout';
 
 type SortMode = 'score' | 'name';
 
+const companyForms: Record<Intl.LDMLPluralRule, string> = {
+  zero: 'компаний', one: 'компания', two: 'компании', few: 'компании', many: 'компаний', other: 'компаний',
+};
+const companyNoun = (count: number) => companyForms[new Intl.PluralRules('ru-RU').select(count)];
+
 export function ScoutPage() {
   const navigate = useNavigate();
   const {
@@ -109,7 +114,7 @@ export function ScoutPage() {
           <div className="results-heading">
             <div>
               <p className="eyebrow">Результат сканирования</p>
-              <h2>{searchResponse.total} компании в фокусе</h2>
+              <h2>{searchResponse.total} {companyNoun(searchResponse.total)} в фокусе</h2>
               <p>Регион: {searchResponse.region} · {searchResponse.mode === 'live'
                 ? 'Актуальные данные Rusprofile, AI-оценка GigaChat'
                 : searchResponse.mode === 'snapshot'

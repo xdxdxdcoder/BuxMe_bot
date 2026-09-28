@@ -30,7 +30,7 @@ export function CompanyCard({ company, favorite, onToggleFavorite, onOpen }: Com
           <Heart size={19} fill={favorite ? 'currentColor' : 'none'} />
         </button>
       </div>
-      <div className="company-card__meta"><MapPin size={15} /><span>{company.region}</span><span>·</span><span>{company.employeesRange} чел.</span></div>
+      <div className="company-card__meta"><MapPin size={15} /><span>{company.region}</span>{company.employeesRange ? <><span>·</span><span>{company.employeesRange} чел.</span></> : null}</div>
       <div className="company-card__score"><ScoreBadge score={company.score} /></div>
       <p className="company-card__explanation">{company.score.explanation}</p>
       <div className="signal-chips">
