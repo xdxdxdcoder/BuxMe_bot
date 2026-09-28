@@ -85,6 +85,8 @@ class ScoutSearchTests(unittest.TestCase):
         self.assertEqual(body["total"], 1)
         self.assertEqual(body["companies"][0]["region"], "Москва")
         self.assertEqual(body["companies"][0]["sources"][0]["checkedAt"], body["sourceDate"])
+        self.assertEqual(body["companies"][0]["score"]["value"], 60)
+        self.assertIn("не подтверждены", body["companies"][0]["score"]["explanation"])
 
     def test_empty_region_is_rejected(self) -> None:
         response = self.client.post("/api/scout/search", json={"region": ""})

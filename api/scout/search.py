@@ -54,6 +54,26 @@ def _snapshot_companies(region: str, limit: int) -> list[dict[str, Any]]:
     ][:limit]
 
 
+def _snapshot_score(company: dict[str, Any], score: dict[str, Any]) -> dict[str, Any]:
+    """Оставляем оценку модели, но не выдаём её догадки за факты."""
+    value = min(score["value"], 60)
+    return {
+        "value": value,
+        "level": "medium" if value >= 40 else "low",
+        "label": "Требуется проверка",
+        "explanation": (
+            "Предварительная AI-оценка по отрасли и региону. "
+            "Наличие полевой команды и интерес к продукту не подтверждены."
+        ),
+        "signals": [
+            f"ОКВЭД: {company['okved_descr']}",
+            f"Регион: {company['region']}",
+        ],
+        "reasons": ["Уточнить структуру продаж и потребность компании перед контактом."],
+        "status": "in_progress",
+    }
+
+
 def _candidate(
     company: dict[str, Any], score: dict[str, Any], checked_at: str | None = None,
 ) -> dict[str, Any]:
@@ -152,13 +172,16 @@ async def search_companies(
                 source_mode = "snapshot"
         scorer = GigaChatScorer(settings)
         try:
-            candidates = [
-                _candidate(
-                    company, await scorer.score(company),
+            candidates = []
+            for company in companies:
+                score = await scorer.score(company)
+                if source_mode == "snapshot":
+                    score = _snapshot_score(company, score)
+                candidates.append(_candidate(
+                    company,
+                    score,
                     _snapshot()["capturedAt"] if source_mode == "snapshot" else None,
-                )
-                for company in companies
-            ]
+                ))
         finally:
             await scorer.close()
     except GigaChatError as exc:
