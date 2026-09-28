@@ -30,4 +30,5 @@ class HttpAuthService implements AuthService {
 }
 
 export const authService: AuthService =
-  import.meta.env.VITE_APP_MODE === 'live' ? new HttpAuthService() : new MockAuthService();
+  (import.meta.env.VITE_RUNTIME_MODE || import.meta.env.VITE_APP_MODE) === 'live'
+    ? new HttpAuthService() : new MockAuthService();

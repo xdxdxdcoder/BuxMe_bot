@@ -33,6 +33,7 @@ class HttpScoutService implements ScoutService {
 }
 
 export const scoutService: ScoutService =
-  import.meta.env.VITE_APP_MODE === 'live' ? new HttpScoutService() : new MockScoutService();
+  (import.meta.env.VITE_RUNTIME_MODE || import.meta.env.VITE_APP_MODE) === 'live'
+    ? new HttpScoutService() : new MockScoutService();
 
 export const searchCompanies = (region: string) => scoutService.searchCompanies({ region });
