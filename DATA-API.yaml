@@ -1,0 +1,133 @@
+openapi: 3.1.0
+info:
+  title: Buxme AI-Scout API
+  version: 0.1.0
+  description: >-
+    API демонстрационного входа и поиска компаний. Живой поиск требует
+    развернутого Docker-бэкенда и серверного ключа GigaChat. Оценки модели
+    являются рекомендациями, а не официальными сведениями.
+servers:
+  - url: https://bux-me-bot.vercel.app
+    description: Публичный адрес Mini App и прокси API
+paths:
+  /api/auth/max:
+    post:
+      summary: Демонстрационный вход сотрудника
+      description: Проверяет только формат кода; не удостоверяет сотрудника или пользователя MAX.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employeeCode]
+              properties:
+                employeeCode:
+                  type: string
+                  example: BUX-2048
+                initData:
+                  type: string
+                  description: Пока не проверяется сервером.
+                  default: ''
+      responses:
+        '200':
+          description: Демонстрационный профиль
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, code, displayName]
+                properties:
+                  id: {type: string}
+                  code: {type: string}
+                  displayName: {type: string}
+                  maxUserId: {type: [integer, 'null']}
+                  avatarUrl: {type: [string, 'null']}
+        '422':
+          description: Неверный формат кода
+  /api/scout/search:
+    post:
+      summary: Поиск и AI-оценка компаний по региону
+      description: >-
+        Получает компании из Rusprofile через Docker-бэкенд и присваивает
+        оценку GigaChat. Список по региону может быть неполным.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [region]
+              properties:
+                region:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                  example: Москва
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                  default: 8
+      responses:
+        '200':
+          description: Список кандидатов
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, region, companies, total, searchedAt, mode]
+                properties:
+                  requestId: {type: string}
+                  region: {type: string}
+                  companies:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Company'
+                  total: {type: integer}
+                  searchedAt: {type: string, format: date-time}
+                  mode: {type: string, const: live}
+        '422':
+          description: Некорректный регион или лимит
+        '502':
+          description: Ошибка внешнего источника, AI-сервиса или Docker-бэкенда
+        '503':
+          description: Живой поиск ещё не настроен
+components:
+  schemas:
+    Company:
+      type: object
+      required: [id, name, region, score, signals, reasons, sources, status]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        region: {type: string}
+        inn: {type: string}
+        phone: {type: string}
+        email: {type: string}
+        website: {type: string}
+        description: {type: string}
+        industry: {type: string}
+        employeesRange: {type: string}
+        score:
+          type: object
+          required: [value, level, label, explanation]
+          properties:
+            value: {type: integer, minimum: 0, maximum: 100}
+            level: {type: string, enum: [low, medium, high]}
+            label: {type: string}
+            explanation: {type: string}
+        signals: {type: array, items: {type: string}}
+        reasons: {type: array, items: {type: string}}
+        sources:
+          type: array
+          items:
+            type: object
+            required: [id, title, category, checkedAt]
+            properties:
+              id: {type: string}
+              title: {type: string}
+              category: {type: string, const: registry}
+              url: {type: [string, 'null'], format: uri}
+              checkedAt: {type: string, format: date-time}
+        status: {type: string, enum: [promising, in_progress, not_fit]}

@@ -9,7 +9,7 @@ from uuid import uuid4
 import httpx
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from api.auth.max import AuthRequest, EmployeeResponse, authenticate
 from server.config import get_settings
@@ -27,6 +27,14 @@ app.add_api_route(
 class SearchRequest(BaseModel):
     region: str = Field(min_length=1, max_length=120)
     limit: int = Field(default=8, ge=1, le=20)
+
+    @field_validator("region")
+    @classmethod
+    def region_is_not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Укажите регион или город")
+        return value
 
 
 def _candidate(company: dict[str, Any], score: dict[str, Any]) -> dict[str, Any]:

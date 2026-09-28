@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: buxme-scout-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.backend
+    dockerContext: .
+    healthCheckPath: /api/scout/search
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: GIGACHAT_API_KEY
+        sync: false

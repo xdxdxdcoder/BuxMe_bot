@@ -64,6 +64,37 @@ class ScoutSearchTests(unittest.TestCase):
         response = self.client.post("/api/scout/search", json={"region": ""})
         self.assertEqual(response.status_code, 422)
 
+        response = self.client.post("/api/scout/search", json={"region": "   "})
+        self.assertEqual(response.status_code, 422)
+
+    def test_proxy_forwards_search_to_configured_docker_backend(self) -> None:
+        class BackendClient:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return None
+
+            async def post(self, url, *, json):
+                self.url = url
+                self.payload = json
+                return type("BackendResponse", (), {
+                    "status_code": 200,
+                    "json": lambda _self: {"mode": "live", "companies": [], "total": 0},
+                })()
+
+        backend = BackendClient()
+        with (
+            patch.dict(os.environ, {"SCOUT_BACKEND_URL": "https://backend.example", "GIGACHAT_API_KEY": ""}),
+            patch("api.scout.search.httpx.AsyncClient", return_value=backend),
+        ):
+            get_settings.cache_clear()
+            response = self.client.post("/api/scout/search", json={"region": " Москва "})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(backend.url, "https://backend.example/api/scout/search")
+        self.assertEqual(backend.payload["region"], "Москва")
+        self.assertEqual(response.json()["mode"], "live")
+
 
 if __name__ == "__main__":
     unittest.main()
