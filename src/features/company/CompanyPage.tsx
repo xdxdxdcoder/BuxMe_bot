@@ -77,7 +77,7 @@ export function CompanyPage() {
 
           <section className="detail-card">
             <div className="section-title"><div><p className="eyebrow">Контакт подтверждает гипотезу</p><h2>Результат первого контакта</h2></div><BriefcaseBusiness size={21} /></div>
-            <p className="section-description">Ответьте на три вопроса — в production AI пересчитает приоритет с учётом разговора.</p>
+            <p className="section-description">Ответьте на три вопроса — демонстрационный расчёт покажет, как может измениться приоритет.</p>
             <ContactScoringForm company={company} />
           </section>
 
@@ -102,7 +102,7 @@ export function CompanyPage() {
             </select>
           </section>
           <section className="ai-actions">
-            <p className="eyebrow">Следующий шаг</p><h3>Подготовить контакт</h3><p>AI адаптирует сообщение под профиль компании.</p>
+            <p className="eyebrow">Следующий шаг · демо</p><h3>Подготовить контакт</h3><p>Пример оффера и скрипта по профилю компании.</p>
             <button className="button button--primary button--full" type="button" onClick={() => createContent('offer')}><Sparkles size={18} /> Создать оффер</button>
             <button className="button button--secondary button--full" type="button" onClick={() => createContent('script')}><FileText size={18} /> Создать скрипт</button>
           </section>

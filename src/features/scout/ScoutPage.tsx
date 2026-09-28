@@ -7,6 +7,7 @@ import { LocationAutocomplete } from '../../components/LocationAutocomplete';
 import { CompanyCard } from '../company/CompanyCard';
 import { SearchProgress } from './SearchProgress';
 import { searchCompanies } from '../../services/scout/scoutService';
+import { ApiError } from '../../services/api/httpClient';
 import { maxBridge } from '../../services/max/maxBridge';
 import type { Company } from '../../types/scout';
 
@@ -61,8 +62,10 @@ export function ScoutPage() {
       setSearchResponse(response);
       addRecentRegion(region.trim());
       maxBridge.notify('success');
-    } catch {
-      setError('Поиск временно недоступен. Проверьте соединение и повторите попытку.');
+    } catch (cause) {
+      setError(cause instanceof ApiError && cause.status === 503
+        ? cause.message
+        : 'Поиск временно недоступен. Повторите попытку позже.');
     } finally {
       setLoading(false);
     }
@@ -107,9 +110,9 @@ export function ScoutPage() {
             <div>
               <p className="eyebrow">Результат сканирования</p>
               <h2>{searchResponse.total} компании в фокусе</h2>
-              <p>Регион: {searchResponse.region} · Демо-данные</p>
+              <p>Регион: {searchResponse.region} · {searchResponse.mode === 'live' ? 'Данные Rusprofile, AI-оценка GigaChat' : 'Демо-данные'}</p>
             </div>
-            <div className="results-heading__metric"><Sparkles size={18} /><span>Средний AI Score</span><strong>{Math.round(searchResponse.companies.reduce((sum, company) => sum + company.score.value, 0) / searchResponse.total)}%</strong></div>
+            {searchResponse.total > 0 ? <div className="results-heading__metric"><Sparkles size={18} /><span>Средний AI Score</span><strong>{Math.round(searchResponse.companies.reduce((sum, company) => sum + company.score.value, 0) / searchResponse.total)}%</strong></div> : null}
           </div>
 
           <div className="filter-bar">

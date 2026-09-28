@@ -1,11 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "buildCommand": "pnpm build",
+  "buildCommand": "pnpm build && PLAYWRIGHT_BROWSERS_PATH=0 python -m playwright install --only-shell chromium",
   "outputDirectory": "dist",
   "functions": {
     "api/**/*.py": {
-      "excludeFiles": "{tests/**,tmp/**,dist/**,node_modules/**}"
+      "excludeFiles": "{tests/**,tmp/**,dist/**,node_modules/**}",
+      "maxDuration": 300
     }
   }
 }

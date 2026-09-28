@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import os
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
@@ -38,9 +39,11 @@ class ScoutSearchTests(unittest.TestCase):
             "status": "promising",
         }
         with (
+            patch.dict(os.environ, {"GIGACHAT_API_KEY": "test-key"}),
             patch("api.scout.search.Parser.parse_rusprofile", return_value=companies),
             patch("api.scout.search.GigaChatScorer.score", new_callable=AsyncMock, return_value=score),
         ):
+            get_settings.cache_clear()
             response = self.client.post("/api/scout/search", json={"region": "Москва"})
 
         self.assertEqual(response.status_code, 200)
@@ -49,6 +52,13 @@ class ScoutSearchTests(unittest.TestCase):
         self.assertEqual(body["companies"][0]["score"]["value"], 82)
         self.assertEqual(body["companies"][0]["status"], "promising")
         self.assertEqual(body["companies"][0]["sources"][0]["category"], "registry")
+
+    def test_missing_ai_key_has_clear_configuration_error(self) -> None:
+        with patch.dict(os.environ, {"GIGACHAT_API_KEY": ""}):
+            get_settings.cache_clear()
+            response = self.client.post("/api/scout/search", json={"region": "Москва"})
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"], "AI-поиск ещё не настроен")
 
     def test_empty_region_is_rejected(self) -> None:
         response = self.client.post("/api/scout/search", json={"region": ""})

@@ -27,10 +27,11 @@ class Settings(BaseSettings):
         alias="GIGACHAT_AUTH_URL",
     )
     gigachat_chat_url: str = Field(
-        default="https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
+        default="https://api.giga.chat/v1/chat/completions",
         alias="GIGACHAT_CHAT_URL",
     )
     gigachat_scope: str = Field(default="GIGACHAT_API_PERS", alias="GIGACHAT_SCOPE")
+    gigachat_model: str = Field(default="GigaChat-2", alias="GIGACHAT_MODEL")
 
     model_config = SettingsConfigDict(
         env_file=".env",

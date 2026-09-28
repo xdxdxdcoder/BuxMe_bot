@@ -41,7 +41,7 @@ export function ContactScoringForm({ company }: { company: Company }) {
     return (
       <div className="recalculation-result">
         <CheckCircle2 size={24} />
-        <p className="eyebrow">Рейтинг обновлён</p>
+        <p className="eyebrow">Демо-пересчёт рейтинга</p>
         <div className="score-change"><span>{recalculation.previousScore}%</span><ArrowRight /><strong>{recalculation.newScore}%</strong></div>
         <p>{recalculation.explanation}</p>
         <button className="text-button" type="button" onClick={() => setRecalculation(null)}><RotateCcw size={16} /> Изменить ответы</button>

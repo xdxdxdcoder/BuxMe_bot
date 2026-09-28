@@ -33,8 +33,10 @@ def _score_payload(label: str) -> dict:
 class FakeClient:
     def __init__(self, responses: list[httpx.Response]) -> None:
         self.responses = responses
+        self.requests: list[dict] = []
 
     async def post(self, *args, **kwargs) -> httpx.Response:
+        self.requests.append({"url": args[0], **kwargs})
         return self.responses.pop(0)
 
 
@@ -63,6 +65,19 @@ class GigaChatScorerTests(unittest.IsolatedAsyncioTestCase):
         )
         with self.assertRaises(GigaChatError):
             await GigaChatScorer(self.settings(), client).score({"name": "Компания"})
+
+    async def test_reuses_oauth_token_and_requests_supported_json_schema(self) -> None:
+        client = FakeClient([
+            _response({"access_token": "token"}),
+            _response(_score_payload("Подходит")),
+            _response(_score_payload("Подходит")),
+        ])
+        scorer = GigaChatScorer(self.settings(), client)
+        await scorer.score({"name": "Первая"})
+        await scorer.score({"name": "Вторая"})
+        self.assertEqual(len(client.requests), 3)
+        self.assertEqual(client.requests[1]["json"]["response_format"]["type"], "json_schema")
+        self.assertEqual(client.requests[1]["json"]["model"], "GigaChat-2")
 
 
 if __name__ == "__main__":

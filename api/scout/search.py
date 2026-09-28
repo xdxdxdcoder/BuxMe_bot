@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
+
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "0")
 
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
@@ -26,11 +29,11 @@ app.add_api_route(
 
 class SearchRequest(BaseModel):
     region: str = Field(min_length=1, max_length=120)
-    limit: int = Field(default=100, ge=1, le=100)
+    limit: int = Field(default=8, ge=1, le=20)
 
 
 def _candidate(company: dict[str, Any], score: dict[str, Any]) -> dict[str, Any]:
-    source_path = company.get("url") or company.get("link") or ""
+    source_path = company.get("source_url") or company.get("url") or company.get("link") or ""
     source_url = (
         source_path
         if str(source_path).startswith("http")
@@ -83,6 +86,8 @@ async def search_companies(
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     settings = get_settings()
+    if not settings.gigachat_api_key.get_secret_value():
+        raise HTTPException(status_code=503, detail="AI-поиск ещё не настроен")
     try:
         companies = await asyncio.to_thread(
             Parser().parse_rusprofile,

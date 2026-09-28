@@ -1,17 +1,11 @@
 import type { Company, ContactResult, GeneratedContent, ScoreRecalculation } from '../../types/scout';
-import { apiRequest } from '../api/httpClient';
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
-const isLive = import.meta.env.VITE_APP_MODE === 'live';
 
 export async function generateCompanyContent(
   company: Company,
   kind: 'offer' | 'script',
 ): Promise<GeneratedContent> {
-  if (isLive) {
-    return apiRequest<GeneratedContent>(`/api/companies/${company.id}/${kind}`, { method: 'POST' });
-  }
-
   await wait(900);
   if (kind === 'offer') {
     return {
@@ -29,13 +23,6 @@ export async function recalculateScore(
   company: Company,
   result: ContactResult,
 ): Promise<ScoreRecalculation> {
-  if (isLive) {
-    return apiRequest<ScoreRecalculation>(`/api/companies/${company.id}/recalculate`, {
-      method: 'POST',
-      body: JSON.stringify(result),
-    });
-  }
-
   await wait(950);
   const weights = [result.reachedDecisionMaker, result.hasFieldTeam, result.automationInterest].reduce(
     (sum, value) => sum + (value === 'yes' ? 5 : value === 'no' ? -7 : 0),

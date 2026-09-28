@@ -12,12 +12,26 @@ from server.max_client import build_ssl_context
 
 
 SYSTEM_PROMPT = """Ты — аналитик B2B-дистрибуции. Оцени компанию как потенциального
-дистрибьютора косметического товара бренда.
+клиента Buxme с полевой торговой командой.
 Верни ровно один JSON без Markdown. Значения label, explanation, signals и reasons
 пиши только на русском языке, с кириллицей. Не выдумывай факты или контакты.
 Поля JSON: value (целое 0..100), level (low|medium|high), label, explanation,
 signals (массив строк), reasons (массив строк), status (promising|in_progress|not_fit).
 Технические значения level и status не переводи."""
+
+SCORE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "value": {"type": "integer", "minimum": 0, "maximum": 100},
+        "level": {"type": "string", "enum": ["low", "medium", "high"]},
+        "label": {"type": "string"},
+        "explanation": {"type": "string"},
+        "signals": {"type": "array", "items": {"type": "string"}},
+        "reasons": {"type": "array", "items": {"type": "string"}},
+        "status": {"type": "string", "enum": ["promising", "in_progress", "not_fit"]},
+    },
+    "required": ["value", "level", "label", "explanation", "signals", "reasons", "status"],
+}
 
 
 class GigaChatError(RuntimeError):
@@ -32,32 +46,15 @@ class GigaChatScorer:
             verify=build_ssl_context(),
         )
         self._owns_client = client is None
+        self._access_token: str | None = None
 
     async def close(self) -> None:
         if self._owns_client:
             await self.client.aclose()
 
     async def score(self, company: dict[str, Any]) -> dict[str, Any]:
-        api_key = self.settings.gigachat_api_key.get_secret_value()
-        if not api_key:
-            raise GigaChatError("GIGACHAT_API_KEY is not configured")
-
-        token_response = await self.client.post(
-            self.settings.gigachat_auth_url,
-            headers={
-                "Authorization": f"Basic {api_key}",
-                "Content-Type": "application/x-www-form-urlencoded",
-                "RqUID": str(uuid.uuid4()),
-            },
-            data={"scope": self.settings.gigachat_scope},
-        )
-        if token_response.is_error:
-            raise GigaChatError(f"GigaChat authorization failed: {token_response.status_code}")
-        access_token = token_response.json().get("access_token")
-        if not isinstance(access_token, str) or not access_token:
-            raise GigaChatError("GigaChat authorization response has no access_token")
-
-        result = await self._request_json(
+        access_token = await self._get_access_token()
+        result = self._validate_result(await self._request_json(
             access_token,
             [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -69,9 +66,9 @@ class GigaChatScorer:
                     ),
                 },
             ],
-        )
+        ))
         if not self._has_russian_text(result):
-            result = await self._request_json(
+            result = self._validate_result(await self._request_json(
                 access_token,
                 [
                     {
@@ -84,10 +81,38 @@ class GigaChatScorer:
                     },
                     {"role": "user", "content": json.dumps(result, ensure_ascii=False)},
                 ],
-            )
+            ))
         if not self._has_russian_text(result):
             raise GigaChatError("GigaChat returned non-Russian scoring text")
-        return self._validate_result(result)
+        return result
+
+    async def _get_access_token(self) -> str:
+        if self._access_token:
+            return self._access_token
+        api_key = self.settings.gigachat_api_key.get_secret_value()
+        if not api_key:
+            raise GigaChatError("GIGACHAT_API_KEY is not configured")
+
+        token_response = await self.client.post(
+            self.settings.gigachat_auth_url,
+            headers={
+                "Authorization": f"Basic {api_key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+                "RqUID": str(uuid.uuid4()),
+            },
+            data={"scope": self.settings.gigachat_scope},
+        )
+        if token_response.is_error:
+            raise GigaChatError(f"GigaChat authorization failed: {token_response.status_code}")
+        try:
+            access_token = token_response.json().get("access_token")
+        except (ValueError, AttributeError) as exc:
+            raise GigaChatError("GigaChat authorization response is invalid") from exc
+        if not isinstance(access_token, str) or not access_token:
+            raise GigaChatError("GigaChat authorization response has no access_token")
+        self._access_token = access_token
+        return access_token
 
     async def _request_json(
         self,
@@ -101,9 +126,9 @@ class GigaChatScorer:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "GigaChat",
+                "model": self.settings.gigachat_model,
                 "temperature": 0.1,
-                "response_format": {"type": "json_object"},
+                "response_format": {"type": "json_schema", "schema": SCORE_SCHEMA, "strict": True},
                 "messages": messages,
             },
         )
@@ -112,7 +137,7 @@ class GigaChatScorer:
         try:
             content = response.json()["choices"][0]["message"]["content"]
             result = json.loads(content)
-        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
             raise GigaChatError("GigaChat returned invalid scoring JSON") from exc
         if not isinstance(result, dict):
             raise GigaChatError("GigaChat scoring result must be an object")
