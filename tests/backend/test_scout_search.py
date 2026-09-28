@@ -60,6 +60,32 @@ class ScoutSearchTests(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["detail"], "AI-поиск ещё не настроен")
 
+    def test_dated_snapshot_is_labeled_and_keeps_original_region(self) -> None:
+        score = {
+            "value": 70,
+            "level": "medium",
+            "label": "Проверить",
+            "explanation": "Нужна проверка",
+            "signals": [],
+            "reasons": [],
+            "status": "in_progress",
+        }
+        with (
+            patch.dict(os.environ, {"GIGACHAT_API_KEY": "test-key", "SCOUT_DATA_SOURCE": "snapshot"}),
+            patch("backend.parser.Parser.parse_rusprofile") as parser,
+            patch("backend.gigachat.GigaChatScorer.score", new_callable=AsyncMock, return_value=score),
+        ):
+            get_settings.cache_clear()
+            response = self.client.post("/api/scout/search", json={"region": "Москва", "limit": 1})
+
+        parser.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["mode"], "snapshot")
+        self.assertEqual(body["total"], 1)
+        self.assertEqual(body["companies"][0]["region"], "Москва")
+        self.assertEqual(body["companies"][0]["sources"][0]["checkedAt"], body["sourceDate"])
+
     def test_empty_region_is_rejected(self) -> None:
         response = self.client.post("/api/scout/search", json={"region": ""})
         self.assertEqual(response.status_code, 422)

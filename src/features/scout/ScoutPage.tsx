@@ -110,7 +110,11 @@ export function ScoutPage() {
             <div>
               <p className="eyebrow">Результат сканирования</p>
               <h2>{searchResponse.total} компании в фокусе</h2>
-              <p>Регион: {searchResponse.region} · {searchResponse.mode === 'live' ? 'Данные Rusprofile, AI-оценка GigaChat' : 'Демо-данные'}</p>
+              <p>Регион: {searchResponse.region} · {searchResponse.mode === 'live'
+                ? 'Актуальные данные Rusprofile, AI-оценка GigaChat'
+                : searchResponse.mode === 'snapshot'
+                  ? `Снимок Rusprofile от ${new Date(searchResponse.sourceDate ?? searchResponse.searchedAt).toLocaleDateString('ru-RU')}, AI-оценка GigaChat. Охват: 17 регионов.`
+                  : 'Демо-данные'}</p>
             </div>
             {searchResponse.total > 0 ? <div className="results-heading__metric"><Sparkles size={18} /><span>Средний AI Score</span><strong>{Math.round(searchResponse.companies.reduce((sum, company) => sum + company.score.value, 0) / searchResponse.total)}%</strong></div> : null}
           </div>
@@ -129,7 +133,9 @@ export function ScoutPage() {
               ))}
             </div>
           ) : (
-            <div className="empty-state"><Search size={28} /><h3>Ничего не найдено</h3><p>Сбросьте фильтры или измените поисковый запрос.</p><button className="text-button" type="button" onClick={() => { setQuery(''); setMinScore(0); setOnlyFavorites(false); }}>Сбросить фильтры</button></div>
+            <div className="empty-state"><Search size={28} /><h3>Ничего не найдено</h3><p>{searchResponse.total === 0 && searchResponse.mode === 'snapshot'
+              ? 'В сохранённом снимке нет компаний для этого региона. Попробуйте Москву или Краснодарский край.'
+              : 'Сбросьте фильтры или измените поисковый запрос.'}</p><button className="text-button" type="button" onClick={() => { setQuery(''); setMinScore(0); setOnlyFavorites(false); }}>Сбросить фильтры</button></div>
           )}
         </section>
       ) : (

@@ -49,8 +49,8 @@ paths:
     post:
       summary: Поиск и AI-оценка компаний по региону
       description: >-
-        Получает компании из Rusprofile через Docker-бэкенд и присваивает
-        оценку GigaChat. Список по региону может быть неполным.
+        Получает компании из Rusprofile или датированного снимка через Docker-бэкенд
+        и присваивает оценку GigaChat. Список по региону может быть неполным.
       requestBody:
         required: true
         content:
@@ -86,7 +86,11 @@ paths:
                       $ref: '#/components/schemas/Company'
                   total: {type: integer}
                   searchedAt: {type: string, format: date-time}
-                  mode: {type: string, const: live}
+                  mode: {type: string, enum: [live, snapshot]}
+                  sourceDate:
+                    type: [string, 'null']
+                    format: date-time
+                    description: Дата снимка, если mode=snapshot.
         '422':
           description: Некорректный регион или лимит
         '502':

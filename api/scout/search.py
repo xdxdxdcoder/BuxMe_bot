@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
-import re
 from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -38,7 +40,23 @@ class SearchRequest(BaseModel):
         return value
 
 
-def _candidate(company: dict[str, Any], score: dict[str, Any]) -> dict[str, Any]:
+@lru_cache
+def _snapshot() -> dict[str, Any]:
+    path = Path(__file__).resolve().parents[2] / "backend/data/rusprofile_snapshot.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _snapshot_companies(region: str, limit: int) -> list[dict[str, Any]]:
+    requested = region.strip().casefold()
+    return [
+        company for company in _snapshot()["companies"]
+        if requested in company["region"].casefold()
+    ][:limit]
+
+
+def _candidate(
+    company: dict[str, Any], score: dict[str, Any], checked_at: str | None = None,
+) -> dict[str, Any]:
     source_path = company.get("source_url") or company.get("url") or company.get("link") or ""
     source_url = (
         source_path
@@ -70,7 +88,7 @@ def _candidate(company: dict[str, Any], score: dict[str, Any]) -> dict[str, Any]
                 "title": "Rusprofile",
                 "category": "registry",
                 "url": source_url or None,
-                "checkedAt": datetime.now(timezone.utc).isoformat(),
+                "checkedAt": checked_at or datetime.now(timezone.utc).isoformat(),
             }
         ],
         "status": score["status"],
@@ -117,15 +135,28 @@ async def search_companies(
     except ImportError as exc:
         raise HTTPException(status_code=503, detail="Сервер поиска ещё не настроен") from exc
     try:
-        companies = await asyncio.to_thread(
-            Parser().parse_rusprofile,
-            request.region,
-            request.limit,
-        )
+        source_mode = "live"
+        if settings.scout_data_source == "snapshot":
+            companies = _snapshot_companies(request.region, request.limit)
+            source_mode = "snapshot"
+        else:
+            try:
+                companies = await asyncio.to_thread(
+                    Parser().parse_rusprofile,
+                    request.region,
+                    request.limit,
+                )
+            except ParserError as exc:
+                logger.warning("Rusprofile unavailable, using dated snapshot: %s", exc)
+                companies = _snapshot_companies(request.region, request.limit)
+                source_mode = "snapshot"
         scorer = GigaChatScorer(settings)
         try:
             candidates = [
-                _candidate(company, await scorer.score(company))
+                _candidate(
+                    company, await scorer.score(company),
+                    _snapshot()["capturedAt"] if source_mode == "snapshot" else None,
+                )
                 for company in companies
             ]
         finally:
@@ -133,23 +164,6 @@ async def search_companies(
     except GigaChatError as exc:
         logger.error("AI scoring failed: %s", exc)
         raise HTTPException(status_code=502, detail="AI scoring service failed") from exc
-    except ParserError as exc:
-        logger.exception("Rusprofile parsing failed")
-        try:
-            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-                page = await client.get("https://www.rusprofile.ru/search-advanced")
-            title = re.search(r"<title[^>]*>(.*?)</title>", page.text, re.I | re.S)
-            logger.error(
-                "Rusprofile diagnostic: status=%s url=%s title=%r form=%s length=%s",
-                page.status_code,
-                page.url,
-                title.group(1).strip()[:160] if title else None,
-                'id="filter-form"' in page.text,
-                len(page.content),
-            )
-        except httpx.HTTPError as diagnostic_exc:
-            logger.error("Rusprofile diagnostic request failed: %s", type(diagnostic_exc).__name__)
-        raise HTTPException(status_code=502, detail="Company search failed") from exc
     except Exception as exc:
         logger.exception("Company search failed")
         raise HTTPException(status_code=502, detail="Company search failed") from exc
@@ -160,5 +174,6 @@ async def search_companies(
         "companies": candidates,
         "total": len(candidates),
         "searchedAt": datetime.now(timezone.utc).isoformat(),
-        "mode": "live",
+        "mode": source_mode,
+        "sourceDate": _snapshot()["capturedAt"] if source_mode == "snapshot" else None,
     }

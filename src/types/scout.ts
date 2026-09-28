@@ -44,7 +44,8 @@ export interface SearchResponse {
   companies: Company[];
   total: number;
   searchedAt: string;
-  mode: 'mock' | 'live';
+  mode: 'mock' | 'live' | 'snapshot';
+  sourceDate?: string | null;
 }
 
 export interface Employee {
