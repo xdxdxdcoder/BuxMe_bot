@@ -12,7 +12,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from api.auth.max import AuthRequest, EmployeeResponse, authenticate
-from backend.gigachat import GigaChatError, GigaChatScorer
 from server.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -104,6 +103,7 @@ async def search_companies(
     if not settings.gigachat_api_key.get_secret_value():
         raise HTTPException(status_code=503, detail="AI-поиск ещё не настроен")
     try:
+        from backend.gigachat import GigaChatError, GigaChatScorer
         from backend.parser import Parser, ParserError
     except ImportError as exc:
         raise HTTPException(status_code=503, detail="Сервер поиска ещё не настроен") from exc

@@ -8,6 +8,5 @@ node_modules
 dist
 coverage
 tmp
-backend
 *.log
 .DS_Store
