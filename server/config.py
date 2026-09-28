@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     )
     gigachat_scope: str = Field(default="GIGACHAT_API_PERS", alias="GIGACHAT_SCOPE")
     gigachat_model: str = Field(default="GigaChat-2", alias="GIGACHAT_MODEL")
+    scout_backend_url: str = Field(default="", alias="SCOUT_BACKEND_URL")
 
     model_config = SettingsConfigDict(
         env_file=".env",

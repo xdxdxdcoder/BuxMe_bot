@@ -2,19 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "0")
-
+import httpx
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from api.auth.max import AuthRequest, EmployeeResponse, authenticate
 from backend.gigachat import GigaChatError, GigaChatScorer
-from backend.parser import Parser, ParserError
 from server.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -86,8 +84,29 @@ async def search_companies(
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     settings = get_settings()
+    if settings.scout_backend_url:
+        try:
+            async with httpx.AsyncClient(timeout=180.0) as client:
+                backend_response = await client.post(
+                    f"{settings.scout_backend_url.rstrip('/')}/api/scout/search",
+                    json=request.model_dump(),
+                )
+            payload = backend_response.json()
+        except (httpx.RequestError, ValueError) as exc:
+            logger.error("Scout backend proxy failed: %s", type(exc).__name__)
+            raise HTTPException(status_code=502, detail="Сервер поиска недоступен") from exc
+        return JSONResponse(
+            status_code=backend_response.status_code,
+            content=payload,
+            headers={"Cache-Control": "no-store"},
+        )
+
     if not settings.gigachat_api_key.get_secret_value():
         raise HTTPException(status_code=503, detail="AI-поиск ещё не настроен")
+    try:
+        from backend.parser import Parser, ParserError
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail="Сервер поиска ещё не настроен") from exc
     try:
         companies = await asyncio.to_thread(
             Parser().parse_rusprofile,

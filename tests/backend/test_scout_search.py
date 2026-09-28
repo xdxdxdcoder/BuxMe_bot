@@ -40,7 +40,7 @@ class ScoutSearchTests(unittest.TestCase):
         }
         with (
             patch.dict(os.environ, {"GIGACHAT_API_KEY": "test-key"}),
-            patch("api.scout.search.Parser.parse_rusprofile", return_value=companies),
+            patch("backend.parser.Parser.parse_rusprofile", return_value=companies),
             patch("api.scout.search.GigaChatScorer.score", new_callable=AsyncMock, return_value=score),
         ):
             get_settings.cache_clear()

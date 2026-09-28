@@ -45,9 +45,9 @@ docker compose up --build
 
 Смотрите `.env.example`. `VITE_*` попадают в браузерную сборку; `BOT_TOKEN`, `MAX_WEBHOOK_SECRET` и `GIGACHAT_API_KEY` должны храниться только на сервере. Ключ GigaChat — Base64-значение для заголовка `Authorization: Basic`, выданное разработчиками сервиса. `GIGACHAT_SCOPE` должен соответствовать типу доступа (`GIGACHAT_API_PERS`, `GIGACHAT_API_B2B` или `GIGACHAT_API_CORP`). Модель задаётся `GIGACHAT_MODEL`; по умолчанию `GigaChat-2`.
 
-Для Vercel переменные задаются в Project Settings → Environment Variables. После их изменения нужна новая production-сборка, поскольку `VITE_APP_MODE` встраивается во frontend при сборке. Публикуйте с `VITE_APP_MODE=live` только после успешной проверки серверного поиска. Без `GIGACHAT_API_KEY` поиск возвращает HTTP 503 с сообщением о ненастроенном AI-поиске.
+Для Vercel переменные задаются в Project Settings → Environment Variables. После их изменения нужна новая production-сборка, поскольку `VITE_APP_MODE` встраивается во frontend при сборке. Публикуйте с `VITE_APP_MODE=live` только после успешной проверки серверного поиска. Без `SCOUT_BACKEND_URL` и `GIGACHAT_API_KEY` поиск возвращает HTTP 503 с сообщением о ненастроенном AI-поиске.
 
-Серверный Playwright требует Chromium и системные библиотеки. Docker-образ устанавливает их. Конфигурация Vercel пытается включить headless Chromium в Python Function; работоспособность этого варианта нужно подтвердить на опубликованном маршруте с настоящим ключом. Если окружение Vercel не поддержит браузер, разместите backend Docker на HTTPS-хостинге и укажите его URL в `VITE_API_BASE_URL` либо настройте проксирование маршрутов. Не публикуйте ключ в `VITE_*`.
+Серверный Playwright требует Chromium и системные библиотеки. Docker-образ устанавливает их. Vercel Function не включает парсер: браузерный пакет превышает ограничение размера функции, а среде не хватает нужных системных библиотек. Разместите Docker-бэкенд на доступном HTTPS-хостинге, затем задайте его адрес в серверной переменной Vercel `SCOUT_BACKEND_URL`. Маршрут Vercel `/api/scout/search` передаст запрос этому бэкенду. Ключ GigaChat задаётся только на Docker-хостинге; не публикуйте его в `VITE_*`.
 
 ## Проверка
 
