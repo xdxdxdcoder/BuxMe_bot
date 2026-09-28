@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -10,11 +13,33 @@ class ParserError(RuntimeError):
     """Ошибка получения JSON-результата Rusprofile."""
 
 
+@lru_cache
+def load_fns_catalog() -> dict[str, Any]:
+    path = Path(__file__).resolve().parent / "data/fns_sme_20260910.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 class Parser:
     """Адаптер готового сценария поиска Rusprofile через AJAX."""
 
     search_url = "https://www.rusprofile.ru/search-advanced"
     ajax_url_part = "/ajax/search/advanced"
+
+    def parse_fns_catalog(
+        self, region: str, limit: int = 12, offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Search the dated, filtered official FNS SME open-data release."""
+        if not 1 <= limit <= 20 or offset < 0:
+            raise ValueError("Invalid catalog pagination")
+        requested = region.strip().casefold().replace("ё", "е")
+        if not requested:
+            return [], 0
+        matches = [
+            company for company in load_fns_catalog()["companies"]
+            if requested in company["region"].casefold().replace("ё", "е")
+            or requested in company["city"].casefold().replace("ё", "е")
+        ]
+        return matches[offset : offset + limit], len(matches)
 
     def parse_rusprofile(self, region: str = "", limit: int = 100) -> list[dict[str, Any]]:
         if not 1 <= limit <= 100:

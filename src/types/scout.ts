@@ -20,6 +20,7 @@ export interface Company {
   id: string;
   name: string;
   region: string;
+  city?: string;
   inn: string;
   phone: string;
   email: string;
@@ -31,11 +32,14 @@ export interface Company {
   sources: CompanySource[];
   status: CompanyStatus;
   employeesRange: string;
+  employeesYear?: number | null;
   industry: string;
 }
 
 export interface SearchRequest {
   region: string;
+  limit?: number;
+  offset?: number;
 }
 
 export interface SearchResponse {
@@ -43,8 +47,11 @@ export interface SearchResponse {
   region: string;
   companies: Company[];
   total: number;
+  availableTotal: number;
+  offset: number;
+  hasMore: boolean;
   searchedAt: string;
-  mode: 'mock' | 'live' | 'snapshot';
+  mode: 'mock' | 'live' | 'snapshot' | 'registry';
   sourceDate?: string | null;
 }
 

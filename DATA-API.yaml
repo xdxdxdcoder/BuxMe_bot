@@ -49,8 +49,9 @@ paths:
     post:
       summary: Поиск и AI-оценка компаний по региону
       description: >-
-        Получает компании из Rusprofile или датированного снимка через Docker-бэкенд
-        и присваивает оценку GigaChat. Список по региону может быть неполным.
+        Получает профильные юридические лица из датированного открытого реестра МСП
+        ФНС и оценивает приоритет проверки с помощью GigaChat. Поддерживает страницы.
+        Оценка не является вероятностью покупки. Полнота списка не гарантируется.
       requestBody:
         required: true
         content:
@@ -68,7 +69,12 @@ paths:
                   type: integer
                   minimum: 1
                   maximum: 20
-                  default: 8
+                  default: 12
+                offset:
+                  type: integer
+                  minimum: 0
+                  maximum: 1000
+                  default: 0
       responses:
         '200':
           description: Список кандидатов
@@ -76,7 +82,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [requestId, region, companies, total, searchedAt, mode]
+                required: [requestId, region, companies, total, availableTotal, offset, hasMore, searchedAt, mode]
                 properties:
                   requestId: {type: string}
                   region: {type: string}
@@ -85,12 +91,15 @@ paths:
                     items:
                       $ref: '#/components/schemas/Company'
                   total: {type: integer}
+                  availableTotal: {type: integer}
+                  offset: {type: integer}
+                  hasMore: {type: boolean}
                   searchedAt: {type: string, format: date-time}
-                  mode: {type: string, enum: [live, snapshot]}
+                  mode: {type: string, enum: [registry, live, snapshot]}
                   sourceDate:
                     type: [string, 'null']
                     format: date-time
-                    description: Дата снимка, если mode=snapshot.
+                    description: Дата выпуска набора ФНС или снимка Rusprofile.
         '422':
           description: Некорректный регион или лимит
         '502':
@@ -106,6 +115,7 @@ components:
         id: {type: string}
         name: {type: string}
         region: {type: string}
+        city: {type: string}
         inn: {type: string}
         phone: {type: string}
         email: {type: string}
@@ -113,6 +123,7 @@ components:
         description: {type: string}
         industry: {type: string}
         employeesRange: {type: string}
+        employeesYear: {type: [integer, 'null']}
         score:
           type: object
           required: [value, level, label, explanation]

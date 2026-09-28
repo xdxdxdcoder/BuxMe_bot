@@ -12,6 +12,7 @@ import { maxBridge } from '../../services/max/maxBridge';
 import type { Company } from '../../types/scout';
 
 type SortMode = 'score' | 'name';
+const isLiveMode = (import.meta.env.VITE_RUNTIME_MODE || import.meta.env.VITE_APP_MODE) === 'live';
 
 const companyForms: Record<Intl.LDMLPluralRule, string> = {
   zero: 'компаний', one: 'компания', two: 'компании', few: 'компании', many: 'компаний', other: 'компаний',
@@ -37,6 +38,8 @@ export function ScoutPage() {
   const [sort, setSort] = useState<SortMode>('score');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState('');
   const [error, setError] = useState('');
 
   const companies = useMemo(() => {
@@ -62,6 +65,7 @@ export function ScoutPage() {
     }
     setLoading(true);
     setError('');
+    setLoadMoreError('');
     try {
       const response = await searchCompanies(region.trim());
       setSearchResponse(response);
@@ -78,6 +82,21 @@ export function ScoutPage() {
 
   const openCompany = (company: Company) => navigate(`/company/${company.id}`);
 
+  const loadMore = async () => {
+    if (!searchResponse || loadingMore) return;
+    setLoadingMore(true);
+    setLoadMoreError('');
+    try {
+      const next = await searchCompanies(searchResponse.region, searchResponse.companies.length);
+      const allCompanies = [...searchResponse.companies, ...next.companies];
+      setSearchResponse({ ...next, companies: allCompanies, total: allCompanies.length });
+    } catch {
+      setLoadMoreError('Не удалось загрузить ещё компании. Повторите попытку.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -93,7 +112,7 @@ export function ScoutPage() {
         <div className="hero-search__copy">
           <span className="live-pill"><span /> AI-powered lead discovery</span>
           <h1>Находим компании,<br /><em>готовые к росту</em></h1>
-          <p>Ищем бизнесы с полевыми торговыми представителями и превращаем открытые сигналы в понятный приоритет.</p>
+          <p>Находим профильные компании в открытом реестре и оцениваем, с кем стоит связаться в первую очередь.</p>
         </div>
         <form className="search-box" onSubmit={handleSearch} noValidate>
           <label htmlFor="region">Регион или город</label>
@@ -114,20 +133,22 @@ export function ScoutPage() {
           <div className="results-heading">
             <div>
               <p className="eyebrow">Результат сканирования</p>
-              <h2>{searchResponse.total} {companyNoun(searchResponse.total)} в фокусе</h2>
+              <h2>{searchResponse.availableTotal ?? searchResponse.total} {companyNoun(searchResponse.availableTotal ?? searchResponse.total)} в выборке</h2>
               <p>Регион: {searchResponse.region} · {searchResponse.mode === 'live'
                 ? 'Актуальные данные Rusprofile, AI-оценка GigaChat'
+                : searchResponse.mode === 'registry'
+                  ? `Реестр МСП ФНС от ${new Date(searchResponse.sourceDate ?? searchResponse.searchedAt).toLocaleDateString('ru-RU')}, AI-оценка GigaChat. Выборка по ОКВЭД 46.45.`
                 : searchResponse.mode === 'snapshot'
                   ? `Снимок Rusprofile от ${new Date(searchResponse.sourceDate ?? searchResponse.searchedAt).toLocaleDateString('ru-RU')}, AI-оценка GigaChat. Охват: 17 регионов.`
                   : 'Демо-данные'}</p>
             </div>
-            {searchResponse.total > 0 ? <div className="results-heading__metric"><Sparkles size={18} /><span>Средний AI Score</span><strong>{Math.round(searchResponse.companies.reduce((sum, company) => sum + company.score.value, 0) / searchResponse.total)}%</strong></div> : null}
+            {searchResponse.total > 0 ? <div className="results-heading__metric"><Sparkles size={18} /><span>Средний индекс</span><strong>{Math.round(searchResponse.companies.reduce((sum, company) => sum + company.score.value, 0) / searchResponse.total)}/100</strong></div> : null}
           </div>
 
           <div className="filter-bar">
             <div className="filter-search"><Search size={17} /><input aria-label="Поиск среди результатов" placeholder="Поиск по компаниям" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
             <button className={`filter-button ${onlyFavorites ? 'is-active' : ''}`} type="button" onClick={() => setOnlyFavorites((value) => !value)}><Heart size={16} /> Избранное</button>
-            <label className="filter-select"><SlidersHorizontal size={16} /><span>Score от</span><select value={minScore} onChange={(event) => setMinScore(Number(event.target.value))}><option value="0">0%</option><option value="70">70%</option><option value="80">80%</option><option value="90">90%</option></select><ChevronDown size={15} /></label>
+            <label className="filter-select"><SlidersHorizontal size={16} /><span>Индекс от</span><select value={minScore} onChange={(event) => setMinScore(Number(event.target.value))}><option value="0">0</option><option value="50">50</option><option value="60">60</option><option value="70">70</option></select><ChevronDown size={15} /></label>
             <label className="filter-select"><span>Сначала</span><select value={sort} onChange={(event) => setSort(event.target.value as SortMode)}><option value="score">сильные</option><option value="name">по названию</option></select><ChevronDown size={15} /></label>
           </div>
 
@@ -140,15 +161,26 @@ export function ScoutPage() {
           ) : (
             <div className="empty-state"><Search size={28} /><h3>Ничего не найдено</h3><p>{searchResponse.total === 0 && searchResponse.mode === 'snapshot'
               ? 'В сохранённом снимке нет компаний для этого региона. Попробуйте Москву или Краснодарский край.'
+              : searchResponse.total === 0 && searchResponse.mode === 'registry'
+                ? 'В этой выборке реестра МСП нет компаний по указанному городу или региону.'
               : 'Сбросьте фильтры или измените поисковый запрос.'}</p><button className="text-button" type="button" onClick={() => { setQuery(''); setMinScore(0); setOnlyFavorites(false); }}>Сбросить фильтры</button></div>
           )}
+          {searchResponse.hasMore ? (
+            <div className="load-more">
+              <p>Показано {searchResponse.companies.length} из {searchResponse.availableTotal}</p>
+              <button className="button button--primary" type="button" disabled={loadingMore} onClick={loadMore}>
+                {loadingMore ? 'Загружаем…' : 'Показать ещё'}
+              </button>
+              {loadMoreError ? <p className="field-error" role="alert">{loadMoreError}</p> : null}
+            </div>
+          ) : null}
         </section>
       ) : (
         <section className="presearch-state">
           <div className="presearch-state__grid">
-            <div><span>01</span><h3>Открытые источники</h3><p>Вакансии, сайты, реестры и отраслевые каталоги.</p></div>
-            <div><span>02</span><h3>Сигналы продаж</h3><p>Признаки региональных и полевых команд.</p></div>
-            <div><span>03</span><h3>AI-приоритет</h3><p>Объяснимый рейтинг от 0 до 100.</p></div>
+            <div><span>01</span><h3>{isLiveMode ? 'Реестр ФНС' : 'Демо-данные'}</h3><p>{isLiveMode ? 'Юридические лица с профильным ОКВЭД из датированного набора открытых данных.' : 'Синтетические компании для знакомства с интерфейсом.'}</p></div>
+            <div><span>02</span><h3>{isLiveMode ? 'Подтверждённые данные' : 'Сценарий продаж'}</h3><p>{isLiveMode ? 'Регион, вид деятельности и сведения о масштабе компании.' : 'Пример признаков для разговора с клиентом.'}</p></div>
+            <div><span>03</span><h3>{isLiveMode ? 'AI-приоритет' : 'Демо-рейтинг'}</h3><p>Объяснимый индекс от 0 до 100.</p></div>
           </div>
         </section>
       )}

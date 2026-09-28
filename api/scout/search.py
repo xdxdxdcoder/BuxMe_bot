@@ -29,7 +29,8 @@ app.add_api_route(
 
 class SearchRequest(BaseModel):
     region: str = Field(min_length=1, max_length=120)
-    limit: int = Field(default=8, ge=1, le=20)
+    limit: int = Field(default=12, ge=1, le=20)
+    offset: int = Field(default=0, ge=0, le=1000)
 
     @field_validator("region")
     @classmethod
@@ -46,29 +47,47 @@ def _snapshot() -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _snapshot_companies(region: str, limit: int) -> list[dict[str, Any]]:
+def _snapshot_companies(region: str, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
     requested = region.strip().casefold()
-    return [
+    matches = [
         company for company in _snapshot()["companies"]
         if requested in company["region"].casefold()
-    ][:limit]
+    ]
+    return matches[offset : offset + limit], len(matches)
 
 
-def _snapshot_score(company: dict[str, Any], score: dict[str, Any]) -> dict[str, Any]:
-    """Оставляем оценку модели, но не выдаём её догадки за факты."""
-    value = min(score["value"], 60)
+def _grounded_score(company: dict[str, Any], score: dict[str, Any]) -> dict[str, Any]:
+    """Blend the model's priority with verifiable signals, without invented claims."""
+    primary = company.get("targetActivity", "primary") == "primary"
+    employees = company.get("employeesCount") or 0
+    category = company.get("mspCategory", "")
+    since = company.get("mspSince", "")
+    years = max(0, 2026 - int(since[-4:])) if len(since) == 10 and since[-4:].isdigit() else 0
+    evidence = (
+        25 + (20 if primary else 8)
+        + {"Малое предприятие": 8, "Среднее предприятие": 12}.get(category, 0)
+        + min(15, round(employees * 0.15))
+        + min(6, years)
+    )
+    value = min(79, round(0.45 * score["value"] + 0.55 * evidence))
+    signals = [
+        f"ОКВЭД 46.45 — {'основной' if primary else 'дополнительный'}",
+        f"Регион: {company['region']}",
+    ]
+    if category:
+        signals.append(f"Категория МСП: {category.lower()}")
+    if company.get("employeesCount") is not None:
+        signals.append(f"Среднесписочная численность за 2025 год: {employees}")
     return {
         "value": value,
-        "level": "medium" if value >= 40 else "low",
-        "label": "Требуется проверка",
+        "level": "high" if value >= 70 else "medium" if value >= 45 else "low",
+        "label": "Приоритет проверки" if value >= 60 else "Требуется проверка",
         "explanation": (
-            "Предварительная AI-оценка по отрасли и региону. "
-            "Наличие полевой команды и интерес к продукту не подтверждены."
+            "AI-оценка приоритета по подтверждённым сведениям об отрасли, регионе "
+            "и масштабе компании. Наличие полевой команды и интерес к продукту "
+            "не подтверждены; оценка не является вероятностью покупки."
         ),
-        "signals": [
-            f"ОКВЭД: {company['okved_descr']}",
-            f"Регион: {company['region']}",
-        ],
+        "signals": signals,
         "reasons": ["Уточнить структуру продаж и потребность компании перед контактом."],
         "status": "in_progress",
     }
@@ -76,24 +95,33 @@ def _snapshot_score(company: dict[str, Any], score: dict[str, Any]) -> dict[str,
 
 def _candidate(
     company: dict[str, Any], score: dict[str, Any], checked_at: str | None = None,
+    source_mode: str = "live", source_url: str | None = None,
 ) -> dict[str, Any]:
-    source_path = company.get("source_url") or company.get("url") or company.get("link") or ""
-    source_url = (
-        source_path
-        if str(source_path).startswith("http")
-        else f"https://www.rusprofile.ru{source_path}"
-    )
+    if source_mode == "registry":
+        source = {"id": "fns", "title": "ФНС России, реестр МСП"}
+    else:
+        source = {"id": "rusprofile", "title": "Rusprofile"}
+        source_path = company.get("source_url") or company.get("url") or company.get("link") or ""
+        source_url = (
+            source_path if str(source_path).startswith("http")
+            else f"https://www.rusprofile.ru{source_path}" if source_path else None
+        )
     return {
         "id": company.get("inn") or company.get("aci_id") or str(uuid4()),
         "name": company.get("name", ""),
         "region": company.get("region", ""),
+        "city": company.get("city", ""),
         "inn": company.get("inn", ""),
         "phone": company.get("phone", ""),
         "email": company.get("email", ""),
         "website": company.get("website", ""),
         "description": company.get("snippet_string", ""),
         "industry": company.get("okved_descr", ""),
-        "employeesRange": company.get("employees_range", ""),
+        "employeesRange": (
+            str(company["employeesCount"]) if company.get("employeesCount") is not None
+            else company.get("employees_range", "")
+        ),
+        "employeesYear": company.get("employeesYear"),
         "score": {
             "value": score["value"],
             "level": score["level"],
@@ -104,8 +132,8 @@ def _candidate(
         "reasons": score["reasons"],
         "sources": [
             {
-                "id": "rusprofile",
-                "title": "Rusprofile",
+                "id": source["id"],
+                "title": source["title"],
                 "category": "registry",
                 "url": source_url or None,
                 "checkedAt": checked_at or datetime.now(timezone.utc).isoformat(),
@@ -151,36 +179,55 @@ async def search_companies(
         raise HTTPException(status_code=503, detail="AI-поиск ещё не настроен")
     try:
         from backend.gigachat import GigaChatError, GigaChatScorer
-        from backend.parser import Parser, ParserError
+        from backend.parser import Parser, ParserError, load_fns_catalog
     except ImportError as exc:
         raise HTTPException(status_code=503, detail="Сервер поиска ещё не настроен") from exc
     try:
         source_mode = "live"
-        if settings.scout_data_source == "snapshot":
-            companies = _snapshot_companies(request.region, request.limit)
+        source_date = None
+        source_url = None
+        if settings.scout_data_source == "fns":
+            companies, available_total = Parser().parse_fns_catalog(
+                request.region, request.limit, request.offset,
+            )
+            source_mode = "registry"
+            source_date = load_fns_catalog()["releasedAt"]
+            source_url = load_fns_catalog()["sourceUrl"]
+        elif settings.scout_data_source == "snapshot":
+            companies, available_total = _snapshot_companies(
+                request.region, request.limit, request.offset,
+            )
             source_mode = "snapshot"
+            source_date = _snapshot()["capturedAt"]
         else:
             try:
                 companies = await asyncio.to_thread(
                     Parser().parse_rusprofile,
                     request.region,
-                    request.limit,
+                    min(100, request.limit + request.offset),
                 )
+                available_total = len(companies)
+                companies = companies[request.offset : request.offset + request.limit]
             except ParserError as exc:
                 logger.warning("Rusprofile unavailable, using dated snapshot: %s", exc)
-                companies = _snapshot_companies(request.region, request.limit)
+                companies, available_total = _snapshot_companies(
+                    request.region, request.limit, request.offset,
+                )
                 source_mode = "snapshot"
+                source_date = _snapshot()["capturedAt"]
         scorer = GigaChatScorer(settings)
         try:
             candidates = []
             for company in companies:
                 score = await scorer.score(company)
-                if source_mode == "snapshot":
-                    score = _snapshot_score(company, score)
+                if source_mode in {"snapshot", "registry"}:
+                    score = _grounded_score(company, score)
                 candidates.append(_candidate(
                     company,
                     score,
-                    _snapshot()["capturedAt"] if source_mode == "snapshot" else None,
+                    source_date,
+                    source_mode,
+                    source_url,
                 ))
         finally:
             await scorer.close()
@@ -196,7 +243,10 @@ async def search_companies(
         "region": request.region.strip(),
         "companies": candidates,
         "total": len(candidates),
+        "availableTotal": available_total,
+        "offset": request.offset,
+        "hasMore": request.offset + len(candidates) < available_total,
         "searchedAt": datetime.now(timezone.utc).isoformat(),
         "mode": source_mode,
-        "sourceDate": _snapshot()["capturedAt"] if source_mode == "snapshot" else None,
+        "sourceDate": source_date,
     }

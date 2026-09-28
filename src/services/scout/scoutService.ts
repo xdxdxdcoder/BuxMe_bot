@@ -15,8 +15,12 @@ class MockScoutService implements ScoutService {
     return {
       requestId: crypto.randomUUID(),
       region: normalized,
-      companies: MOCK_COMPANIES.map((company) => ({ ...company, region: normalized })),
-      total: MOCK_COMPANIES.length,
+      companies: MOCK_COMPANIES.slice(request.offset ?? 0, (request.offset ?? 0) + (request.limit ?? 12))
+        .map((company) => ({ ...company, region: normalized })),
+      total: Math.min(request.limit ?? 12, Math.max(0, MOCK_COMPANIES.length - (request.offset ?? 0))),
+      availableTotal: MOCK_COMPANIES.length,
+      offset: request.offset ?? 0,
+      hasMore: (request.offset ?? 0) + (request.limit ?? 12) < MOCK_COMPANIES.length,
       searchedAt: new Date().toISOString(),
       mode: 'mock',
     };
@@ -36,4 +40,5 @@ export const scoutService: ScoutService =
   (import.meta.env.VITE_RUNTIME_MODE || import.meta.env.VITE_APP_MODE) === 'live'
     ? new HttpScoutService() : new MockScoutService();
 
-export const searchCompanies = (region: string) => scoutService.searchCompanies({ region });
+export const searchCompanies = (region: string, offset = 0) =>
+  scoutService.searchCompanies({ region, limit: 12, offset });

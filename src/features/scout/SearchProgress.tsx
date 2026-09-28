@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Check, LoaderCircle } from 'lucide-react';
 
-const STEPS = ['Ищем компании', 'Проверяем открытые источники', 'Анализируем признаки полевых продаж', 'Формируем рейтинг'];
+const isLiveMode = (import.meta.env.VITE_RUNTIME_MODE || import.meta.env.VITE_APP_MODE) === 'live';
+const STEPS = isLiveMode
+  ? ['Ищем компании', 'Читаем реестр ФНС', 'Анализируем подтверждённые признаки', 'Формируем рейтинг']
+  : ['Готовим демо-компании', 'Показываем пример карточек', 'Формируем пример рейтинга'];
 
 export function SearchProgress() {
   const [activeStep, setActiveStep] = useState(0);

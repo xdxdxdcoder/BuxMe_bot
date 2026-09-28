@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from api.scout.search import app
+from api.scout.search import _grounded_score, app
 from server.config import get_settings
 
 
@@ -39,7 +39,7 @@ class ScoutSearchTests(unittest.TestCase):
             "status": "promising",
         }
         with (
-            patch.dict(os.environ, {"GIGACHAT_API_KEY": "test-key"}),
+            patch.dict(os.environ, {"GIGACHAT_API_KEY": "test-key", "SCOUT_DATA_SOURCE": "rusprofile"}),
             patch("backend.parser.Parser.parse_rusprofile", return_value=companies),
             patch("backend.gigachat.GigaChatScorer.score", new_callable=AsyncMock, return_value=score),
         ):
@@ -85,8 +85,46 @@ class ScoutSearchTests(unittest.TestCase):
         self.assertEqual(body["total"], 1)
         self.assertEqual(body["companies"][0]["region"], "Москва")
         self.assertEqual(body["companies"][0]["sources"][0]["checkedAt"], body["sourceDate"])
-        self.assertEqual(body["companies"][0]["score"]["value"], 60)
+        self.assertGreater(body["companies"][0]["score"]["value"], 40)
+        self.assertLess(body["companies"][0]["score"]["value"], 80)
         self.assertIn("не подтверждены", body["companies"][0]["score"]["explanation"])
+
+    def test_fns_search_exposes_source_count_and_next_page(self) -> None:
+        score = {
+            "value": 70, "level": "medium", "label": "Проверить",
+            "explanation": "Нужна проверка", "signals": [], "reasons": [],
+            "status": "in_progress",
+        }
+        with (
+            patch.dict(os.environ, {"GIGACHAT_API_KEY": "test-key", "SCOUT_DATA_SOURCE": "fns", "SCOUT_BACKEND_URL": ""}),
+            patch("backend.gigachat.GigaChatScorer.score", new_callable=AsyncMock, return_value=score),
+        ):
+            get_settings.cache_clear()
+            response = self.client.post("/api/scout/search", json={"region": "Москва", "limit": 2})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["mode"], "registry")
+        self.assertEqual(body["total"], 2)
+        self.assertGreater(body["availableTotal"], 2)
+        self.assertTrue(body["hasMore"])
+        self.assertEqual(body["companies"][0]["sources"][0]["id"], "fns")
+        self.assertIn("nalog.gov.ru", body["companies"][0]["sources"][0]["url"])
+
+    def test_grounded_ai_priority_varies_with_verified_company_data(self) -> None:
+        model_score = {"value": 75}
+        small_wholesaler = {
+            "region": "Москва", "targetActivity": "primary", "mspCategory": "Малое предприятие",
+            "employeesCount": 40, "mspSince": "10.03.2018",
+        }
+        micro_retailer = {
+            "region": "Москва", "targetActivity": "additional", "mspCategory": "Микропредприятие",
+            "employeesCount": 2, "mspSince": "10.03.2025",
+        }
+        high = _grounded_score(small_wholesaler, model_score)
+        low = _grounded_score(micro_retailer, model_score)
+        self.assertGreater(high["value"], low["value"])
+        self.assertLess(high["value"], 80)
+        self.assertIn("не подтверждены", high["explanation"])
 
     def test_empty_region_is_rejected(self) -> None:
         response = self.client.post("/api/scout/search", json={"region": ""})
