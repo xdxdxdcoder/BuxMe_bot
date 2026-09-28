@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -134,6 +135,20 @@ async def search_companies(
         raise HTTPException(status_code=502, detail="AI scoring service failed") from exc
     except ParserError as exc:
         logger.exception("Rusprofile parsing failed")
+        try:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                page = await client.get("https://www.rusprofile.ru/search-advanced")
+            title = re.search(r"<title[^>]*>(.*?)</title>", page.text, re.I | re.S)
+            logger.error(
+                "Rusprofile diagnostic: status=%s url=%s title=%r form=%s length=%s",
+                page.status_code,
+                page.url,
+                title.group(1).strip()[:160] if title else None,
+                'id="filter-form"' in page.text,
+                len(page.content),
+            )
+        except httpx.HTTPError as diagnostic_exc:
+            logger.error("Rusprofile diagnostic request failed: %s", type(diagnostic_exc).__name__)
         raise HTTPException(status_code=502, detail="Company search failed") from exc
     except Exception as exc:
         logger.exception("Company search failed")
