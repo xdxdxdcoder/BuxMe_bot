@@ -5,7 +5,7 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile.backend
     dockerContext: .
-    healthCheckPath: /api/scout/search
+    healthCheckPath: /
     envVars:
       - key: PORT
         value: "8000"
