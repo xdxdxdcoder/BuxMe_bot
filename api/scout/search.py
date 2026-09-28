@@ -133,7 +133,7 @@ async def search_companies(
         logger.error("AI scoring failed: %s", exc)
         raise HTTPException(status_code=502, detail="AI scoring service failed") from exc
     except ParserError as exc:
-        logger.error("Rusprofile parsing failed: %s", exc)
+        logger.exception("Rusprofile parsing failed")
         raise HTTPException(status_code=502, detail="Company search failed") from exc
     except Exception as exc:
         logger.exception("Company search failed")
