@@ -6,10 +6,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-from playwright.sync_api import sync_playwright
-
-
 class ParserError(RuntimeError):
     """Ошибка получения JSON-результата Rusprofile."""
 
@@ -49,6 +45,8 @@ class Parser:
         return matches[offset : offset + limit], len(matches)
 
     def parse_rusprofile(self, region: str = "", limit: int = 100) -> list[dict[str, Any]]:
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+        from playwright.sync_api import sync_playwright
         if not 1 <= limit <= 100:
             raise ValueError("Limit must be between 1 and 100")
 

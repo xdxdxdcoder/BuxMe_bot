@@ -26,6 +26,8 @@ export function CompanyPage() {
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState('');
   const goBack = useCallback(() => navigate('/scout'), [navigate]);
+  const contactQuery = company ? [company.name, company.inn || company.region, 'контакты телефон официальный сайт'].join(' ') : '';
+  const contactSearchUrl = `https://yandex.ru/search/?text=${encodeURIComponent(contactQuery)}`;
   useMaxBackButton(goBack);
 
   if (!employee) return <Navigate to="/login" replace />;
@@ -83,7 +85,7 @@ export function CompanyPage() {
 
           <section className="detail-card">
             <div className="section-title"><div><p className="eyebrow">Прозрачность данных</p><h2>Источники</h2></div><Globe2 size={21} /></div>
-            <div className="source-list">{company.sources.map((source) => <div key={source.id}><div className="source-icon"><FileText size={18} /></div><div><strong>{source.url ? <a href={source.url} target="_blank" rel="noreferrer">{source.title} <ExternalLink size={13} /></a> : source.title}</strong><span>Данные от {formatDate(source.checkedAt)}</span></div><span className="source-type">Реестр</span></div>)}</div>
+            <div className="source-list">{company.sources.map((source) => <div key={source.id}><div className="source-icon"><FileText size={18} /></div><div><strong>{source.url ? <a href={source.url} target="_blank" rel="noreferrer">{source.title} <ExternalLink size={13} /></a> : source.title}</strong><span>Данные от {formatDate(source.checkedAt)}</span></div><span className="source-type">{source.category === 'website' ? 'Сайт' : 'Реестр'}</span></div>)}</div>
           </section>
         </div>
 
@@ -94,7 +96,8 @@ export function CompanyPage() {
             {company.phone ? <div className="contact-row"><span><Phone size={17} /> Телефон</span><button type="button" onClick={() => copyText(company.phone)}>{company.phone} <Copy size={14} /></button></div> : null}
             {company.email ? <div className="contact-row"><span><Mail size={17} /> Email</span><button type="button" onClick={() => copyText(company.email)}>{company.email} <Copy size={14} /></button></div> : null}
             {company.website ? <div className="contact-row"><span><Globe2 size={17} /> Сайт</span><button type="button" onClick={() => maxBridge.openExternal(company.website)}>Открыть <ExternalLink size={14} /></button></div> : null}
-            {!company.inn && !company.phone && !company.email && !company.website ? <p className="section-description">Контакты в открытом наборе не указаны.</p> : null}
+            <p className="section-description">Телефон и сайт показываются только при наличии источника. Перед звонком проверьте, что контакт относится к этому юридическому лицу.</p>
+            <button className="text-button" type="button" onClick={() => maxBridge.openExternal(contactSearchUrl)}>Найти контакты по названию{company.inn ? ' и ИНН' : ''} <ExternalLink size={14} /></button>
           </section>
           <section className="detail-card status-card">
             <label htmlFor="company-status">Статус работы</label>

@@ -1,12 +1,30 @@
 services:
   backend:
+    image: buxme-backend
     build:
       context: .
       dockerfile: Dockerfile.backend
-    env_file:
-      - .env
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:-}
+      MAX_WEBHOOK_SECRET: ${MAX_WEBHOOK_SECRET:-}
+      GIGACHAT_API_KEY: ${GIGACHAT_API_KEY:-}
+      SCOUT_DATA_SOURCE: fns
     expose:
       - "8000"
+    restart: unless-stopped
+
+  webhook:
+    image: buxme-backend
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["uvicorn", "api.max.webhook:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:-}
+      MAX_WEBHOOK_SECRET: ${MAX_WEBHOOK_SECRET:-}
+      MAX_BOT_USERNAME: ${MAX_BOT_USERNAME:-t519_hakaton_max_bot}
+    expose:
+      - "8001"
     restart: unless-stopped
 
   mini-app:
@@ -17,7 +35,8 @@ services:
         VITE_APP_MODE: live
         VITE_API_BASE_URL: ""
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       - backend
+      - webhook
     restart: unless-stopped

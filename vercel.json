@@ -5,7 +5,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/**/*.py": {
-      "excludeFiles": "{tests/**,tmp/**,dist/**,node_modules/**,backend/parser.py}",
+      "excludeFiles": "{tests/**,tmp/**,dist/**,node_modules/**}",
       "maxDuration": 300
     }
   }

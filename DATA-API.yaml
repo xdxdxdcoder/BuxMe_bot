@@ -1,155 +1,50 @@
-openapi: 3.1.0
-info:
-  title: Buxme AI-Scout API
-  version: 0.1.0
-  description: >-
-    API демонстрационного входа и поиска компаний. Живой поиск требует
-    развернутого Docker-бэкенда и серверного ключа GigaChat. Оценки модели
-    являются рекомендациями, а не официальными сведениями.
-servers:
-  - url: https://bux-me-bot.vercel.app
-    description: Публичный адрес Mini App и прокси API
-paths:
-  /api/auth/max:
-    post:
-      summary: Демонстрационный вход сотрудника
-      description: Проверяет только формат кода; не удостоверяет сотрудника или пользователя MAX.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [employeeCode]
-              properties:
-                employeeCode:
-                  type: string
-                  example: BUX-2048
-                initData:
-                  type: string
-                  description: Пока не проверяется сервером.
-                  default: ''
-      responses:
-        '200':
-          description: Демонстрационный профиль
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [id, code, displayName]
-                properties:
-                  id: {type: string}
-                  code: {type: string}
-                  displayName: {type: string}
-                  maxUserId: {type: [integer, 'null']}
-                  avatarUrl: {type: [string, 'null']}
-        '422':
-          description: Неверный формат кода
-  /api/scout/search:
-    post:
-      summary: Поиск и AI-оценка компаний по региону
-      description: >-
-        Получает юридические лица и ИП с основным ОКВЭД 46.45 или 46.45.1
-        (оптовая торговля парфюмерией и косметикой) из
-        датированного открытого реестра МСП ФНС. Для юрлиц нужна численность
-        не менее пяти сотрудников по данным за 2025 год. Совпадение с реестром
-        получателей поддержки МСП отображается отдельным источником, но не
-        повышает индекс. GigaChat оценивает приоритет; при недоступности AI
-        использует расчёт по подтверждённым полям. Поддерживает страницы.
-        Оценка не является вероятностью покупки. Полнота списка не гарантируется.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [region]
-              properties:
-                region:
-                  type: string
-                  minLength: 1
-                  maxLength: 120
-                  example: Москва
-                limit:
-                  type: integer
-                  minimum: 1
-                  maximum: 20
-                  default: 12
-                offset:
-                  type: integer
-                  minimum: 0
-                  maximum: 1000
-                  default: 0
-      responses:
-        '200':
-          description: Список кандидатов
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [requestId, region, companies, total, availableTotal, offset, hasMore, searchedAt, mode, scoringMode]
-                properties:
-                  requestId: {type: string}
-                  region: {type: string}
-                  companies:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Company'
-                  total: {type: integer}
-                  availableTotal: {type: integer}
-                  offset: {type: integer}
-                  hasMore: {type: boolean}
-                  searchedAt: {type: string, format: date-time}
-                  mode: {type: string, enum: [registry, live, snapshot]}
-                  scoringMode: {type: string, enum: [giga, factual]}
-                  sourceDate:
-                    type: [string, 'null']
-                    format: date-time
-                    description: Дата выпуска основного набора ФНС или снимка Rusprofile. Дополнительные источники имеют собственную дату в карточке.
-        '422':
-          description: Некорректный регион или лимит
-        '502':
-          description: Ошибка внешнего источника, AI-сервиса или Docker-бэкенда
-        '503':
-          description: Сервер поиска ещё не настроен
-components:
-  schemas:
-    Company:
-      type: object
-      required: [id, name, region, score, signals, reasons, sources, status]
-      properties:
-        id: {type: string}
-        entityType: {type: string, enum: [legal_entity, sole_proprietor]}
-        name: {type: string}
-        region: {type: string}
-        city: {type: string}
-        inn: {type: string}
-        phone: {type: string}
-        email: {type: string}
-        website: {type: string}
-        description: {type: string}
-        industry: {type: string}
-        employeesRange: {type: string}
-        employeesYear: {type: [integer, 'null']}
-        score:
-          type: object
-          required: [value, level, label, explanation]
-          properties:
-            value: {type: integer, minimum: 0, maximum: 100}
-            level: {type: string, enum: [low, medium, high]}
-            label: {type: string}
-            explanation: {type: string}
-        signals: {type: array, items: {type: string}}
-        reasons: {type: array, items: {type: string}}
-        sources:
-          type: array
-          items:
-            type: object
-            required: [id, title, category, checkedAt]
-            properties:
-              id: {type: string}
-              title: {type: string}
-              category: {type: string, const: registry}
-              url: {type: [string, 'null'], format: uri}
-              checkedAt: {type: string, format: date-time}
-        status: {type: string, enum: [promising, in_progress, not_fit]}
+version: '1.0'
+solution: Buxme AI-Scout
+baseUrl: https://bux-me-bot.vercel.app
+openapi: openapi.yaml
+notes: >-
+  Проверка проводится с российского IP. При переносе на другой HTTPS-хостинг
+  замените baseUrl и сервер в openapi.yaml до отправки организаторам.
+  Код сотрудника демонстрационный; рабочие токены здесь отсутствуют.
+requiredChecks:
+  - id: employee-demo-login
+    method: POST
+    path: /api/auth/max
+    role: public_demo
+    request:
+      contentType: application/json
+      body:
+        employeeCode: BUX-2048
+        initData: ''
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields: [id, code, displayName]
+  - id: search-fns-moscow
+    method: POST
+    path: /api/scout/search
+    role: public_demo
+    request:
+      contentType: application/json
+      body:
+        region: Москва
+        limit: 1
+        offset: 0
+    expected:
+      statusCodes: [200]
+      contentType: application/json
+      requiredFields: [requestId, region, companies, total, availableTotal, offset, hasMore, searchedAt, mode, scoringMode, sourceDate]
+      fieldValues:
+        mode: registry
+  - id: search-invalid-region
+    method: POST
+    path: /api/scout/search
+    role: public_demo
+    request:
+      contentType: application/json
+      body:
+        region: ''
+    expected:
+      statusCodes: [422]
+      contentType: application/json
+      requiredFields: [detail]

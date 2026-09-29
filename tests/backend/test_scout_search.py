@@ -158,6 +158,15 @@ class ScoutSearchTests(unittest.TestCase):
         self.assertEqual(candidate["entityType"], "sole_proprietor")
         self.assertEqual(len(candidate["sources"]), 2)
 
+    def test_curated_contact_is_attached_only_to_matching_inn(self) -> None:
+        company = {"catalogId": "2225147567", "inn": "2225147567", "name": "ООО МЕЙТАН", "region": "Алтайский край"}
+        score = _grounded_score(company, {"value": 50}, ai_used=False)
+        candidate = _candidate(company, score, source_mode="registry")
+        self.assertEqual(candidate["phone"], "+7 800 775-80-72")
+        self.assertTrue(any(source["id"] == "company-contacts" for source in candidate["sources"]))
+        other = _candidate({**company, "inn": "0000000000"}, score, source_mode="registry")
+        self.assertEqual(other["phone"], "")
+
     def test_empty_region_is_rejected(self) -> None:
         response = self.client.post("/api/scout/search", json={"region": ""})
         self.assertEqual(response.status_code, 422)
@@ -183,7 +192,7 @@ class ScoutSearchTests(unittest.TestCase):
 
         backend = BackendClient()
         with (
-            patch.dict(os.environ, {"SCOUT_BACKEND_URL": "https://backend.example", "GIGACHAT_API_KEY": ""}),
+            patch.dict(os.environ, {"SCOUT_BACKEND_URL": "https://backend.example", "SCOUT_DATA_SOURCE": "snapshot", "GIGACHAT_API_KEY": ""}),
             patch("api.scout.search.httpx.AsyncClient", return_value=backend),
         ):
             get_settings.cache_clear()

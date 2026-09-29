@@ -4,6 +4,13 @@
 .env.*
 !.env.example
 .vercel
+.venv
+venv
+__pycache__
+.pytest_cache
+design-system
+docs
+tests
 node_modules
 dist
 coverage

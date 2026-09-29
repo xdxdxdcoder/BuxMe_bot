@@ -19,6 +19,28 @@ from server.config import get_settings
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Buxme AI-Scout", docs_url="/docs", redoc_url=None)
+VERIFIED_CONTACTS = {
+    # Public contact of the company, checked against its official website.
+    "2225147567": {
+        "phone": "+7 800 775-80-72",
+        "website": "https://meitanglobal.com/contacts/",
+        "source": "https://meitanglobal.com/contacts/",
+        "checked_at": "2026-09-30T00:00:00+03:00",
+    },
+    "7806577036": {
+        "phone": "+7 800 550-98-50",
+        "email": "b2b@parisnail.ru",
+        "website": "https://parisnail.ru/contacts.html",
+        "source": "https://parisnail.ru/contacts.html",
+        "checked_at": "2026-09-30T00:00:00+03:00",
+    },
+    "9715397054": {
+        "email": "sales@carely.group",
+        "website": "https://art-fact-products.com/contacts/",
+        "source": "https://art-fact-products.com/contacts/",
+        "checked_at": "2026-09-30T00:00:00+03:00",
+    },
+}
 app.add_api_route(
     "/api/auth/max",
     authenticate,
@@ -120,6 +142,7 @@ def _candidate(
     source_mode: str = "live", source_url: str | None = None,
     support_source_url: str | None = None, support_date: str | None = None,
 ) -> dict[str, Any]:
+    contact = VERIFIED_CONTACTS.get(str(company.get("inn", "")), {})
     if source_mode == "registry":
         source = {"id": "fns", "title": "ФНС России, реестр МСП"}
     else:
@@ -144,6 +167,14 @@ def _candidate(
             "url": support_source_url,
             "checkedAt": support_date,
         })
+    if contact:
+        sources.append({
+            "id": "company-contacts",
+            "title": "Контакты на сайте компании",
+            "category": "website",
+            "url": contact["source"],
+            "checkedAt": contact["checked_at"],
+        })
     return {
         "id": company.get("catalogId") or company.get("inn") or company.get("aci_id") or str(uuid4()),
         "entityType": company.get("entityType", "legal_entity"),
@@ -151,9 +182,9 @@ def _candidate(
         "region": company.get("region", ""),
         "city": company.get("city", ""),
         "inn": company.get("inn", ""),
-        "phone": company.get("phone", ""),
-        "email": company.get("email", ""),
-        "website": company.get("website", ""),
+        "phone": contact.get("phone") or company.get("phone", ""),
+        "email": contact.get("email") or company.get("email", ""),
+        "website": contact.get("website") or company.get("website", ""),
         "description": company.get("snippet_string", ""),
         "industry": company.get("okved_descr", ""),
         "employeesRange": (
@@ -189,7 +220,9 @@ async def search_companies(
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     settings = get_settings()
-    if settings.scout_backend_url:
+    # The dated FNS catalog is bundled with the function; a sleeping remote
+    # proxy would only delay the primary user scenario.
+    if settings.scout_backend_url and settings.scout_data_source != "fns":
         try:
             async with httpx.AsyncClient(timeout=180.0) as client:
                 backend_response = await client.post(
