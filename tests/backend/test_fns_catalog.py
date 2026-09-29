@@ -26,6 +26,9 @@ class FnsCatalogTests(unittest.TestCase):
         krasnodar_city, city_total = parser.parse_fns_catalog("Краснодар")
         self.assertGreater(city_total, 0)
         self.assertTrue(all(entry["city"] == "Краснодар" for entry in krasnodar_city))
+        _page, canonical_total = parser.parse_fns_catalog("Кемеровская область - Кузбасс")
+        _page, alternate_total = parser.parse_fns_catalog("Кемеровская область — Кузбасс")
+        self.assertEqual(canonical_total, alternate_total)
 
     def test_all_listed_regions_have_searchable_pages(self) -> None:
         locations = Path(__file__).resolve().parents[2] / "src/data/russian-locations.json"

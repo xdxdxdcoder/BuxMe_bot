@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -31,11 +32,11 @@ class Parser:
         """Search the dated, filtered official FNS SME open-data release."""
         if not 1 <= limit <= 20 or offset < 0:
             raise ValueError("Invalid catalog pagination")
-        requested = region.strip().casefold().replace("ё", "е")
+        normalize = lambda value: re.sub(r"[^а-я0-9]+", "", value.casefold().replace("ё", "е"))
+        requested = normalize(region.strip())
         if not requested:
             return [], 0
         companies = load_fns_catalog()["companies"]
-        normalize = lambda value: value.casefold().replace("ё", "е")
         region_matches = [company for company in companies if normalize(company["region"]) == requested]
         city_matches = [company for company in companies if normalize(company["city"]) == requested]
         matches = region_matches or city_matches
