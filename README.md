@@ -28,7 +28,7 @@ Buxme AI-Scout помогает менеджеру по развитию Buxme �
 - `backend/parser.py`: чтение подготовленного каталога; старый режим Rusprofile существует для разработки, но не нужен для основного сценария.
 - `nginx.conf`: отдача Mini App и прокси API в Docker.
 
-В репозитории два зафиксированных набора зависимостей: `pnpm-lock.yaml` для frontend и `requirements.txt` for Python (`requirements.legacy.txt` only for the unused Rusprofile developer mode) для Python. Внешние сервисы: MAX Bot API и Bridge, открытые данные ФНС, необязательный GigaChat. Рабочие токены MAX и GigaChat необходимо задавать только через переменные сервера.
+В репозитории два зафиксированных набора зависимостей: `pnpm-lock.yaml` для frontend и `requirements.txt` для Python. `requirements.legacy.txt` нужен только для старого режима Rusprofile, который не входит в основной сценарий. Внешние сервисы: MAX Bot API и Bridge, открытые данные ФНС, необязательный GigaChat. Рабочие токены MAX и GigaChat необходимо задавать только через переменные сервера.
 
 ## Одна команда запуска через Docker
 
@@ -75,7 +75,7 @@ curl -X POST http://localhost:8080/api/scout/search -H 'Content-Type: applicatio
 2. В MAX откройте [бота](https://max.ru/t519_hakaton_max_bot), отправьте `/start`, нажмите «Открыть AI-Scout».
 3. Введите `BUX-2048`, найдите «Алтайский край», откройте карточку и проверьте контакт, источник и пометку расчёта.
 4. Повторите в мобильном и веб-клиенте MAX. Убедитесь, что путь открытия, вход, поиск, карточка и переход по контакту работают.
-5. Проверьте, что webhook доступен извне по `GET /api/max/webhook`; его конфигурация требует секретов, переданных вне Git.
+5. Проверьте действующий webhook отдельно по `GET https://bux-me-bot.vercel.app/api/max/webhook`. Он остаётся на Vercel и требует серверных секретов; Mini App и API поиска размещаются на Render.
 
 ## Автоматические проверки
 
