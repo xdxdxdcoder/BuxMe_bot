@@ -34,11 +34,17 @@ class Parser:
         requested = region.strip().casefold().replace("ё", "е")
         if not requested:
             return [], 0
-        matches = [
-            company for company in load_fns_catalog()["companies"]
-            if requested in company["region"].casefold().replace("ё", "е")
-            or requested in company["city"].casefold().replace("ё", "е")
-        ]
+        companies = load_fns_catalog()["companies"]
+        normalize = lambda value: value.casefold().replace("ё", "е")
+        region_matches = [company for company in companies if normalize(company["region"]) == requested]
+        city_matches = [company for company in companies if normalize(company["city"]) == requested]
+        matches = region_matches or city_matches
+        if not matches:
+            matches = [
+                company for company in companies
+                if requested in normalize(company["region"])
+                or requested in normalize(company["city"])
+            ]
         return matches[offset : offset + limit], len(matches)
 
     def parse_rusprofile(self, region: str = "", limit: int = 100) -> list[dict[str, Any]]:

@@ -14,11 +14,6 @@ import type { Company } from '../../types/scout';
 type SortMode = 'score' | 'name';
 const isLiveMode = (import.meta.env.VITE_RUNTIME_MODE || import.meta.env.VITE_APP_MODE) === 'live';
 
-const companyForms: Record<Intl.LDMLPluralRule, string> = {
-  zero: 'компаний', one: 'компания', two: 'компании', few: 'компании', many: 'компаний', other: 'компаний',
-};
-const companyNoun = (count: number) => companyForms[new Intl.PluralRules('ru-RU').select(count)];
-
 export function ScoutPage() {
   const navigate = useNavigate();
   const {
@@ -111,8 +106,8 @@ export function ScoutPage() {
       <section className="hero-search">
         <div className="hero-search__copy">
           <span className="live-pill"><span /> AI-powered lead discovery</span>
-          <h1>Находим компании,<br /><em>готовые к росту</em></h1>
-          <p>Находим профильные компании в открытом реестре и оцениваем, с кем стоит связаться в первую очередь.</p>
+          <h1>Находим оптовые компании<br /><em>для проверки</em></h1>
+          <p>Показываем зарегистрированные компании и ИП с оптовым профилем и подсказываем, кого проверить в первую очередь.</p>
         </div>
         <form className="search-box" onSubmit={handleSearch} noValidate>
           <label htmlFor="region">Регион или город</label>
@@ -133,11 +128,11 @@ export function ScoutPage() {
           <div className="results-heading">
             <div>
               <p className="eyebrow">Результат сканирования</p>
-              <h2>{searchResponse.availableTotal ?? searchResponse.total} {companyNoun(searchResponse.availableTotal ?? searchResponse.total)} в выборке</h2>
+              <h2>Субъектов МСП в выборке: {searchResponse.availableTotal ?? searchResponse.total}</h2>
               <p>Регион: {searchResponse.region} · {searchResponse.mode === 'live'
                 ? 'Актуальные данные Rusprofile, AI-оценка GigaChat'
                 : searchResponse.mode === 'registry'
-                  ? `Реестр МСП ФНС от ${new Date(searchResponse.sourceDate ?? searchResponse.searchedAt).toLocaleDateString('ru-RU')}, AI-оценка GigaChat. Выборка по ОКВЭД 46.45.`
+                  ? `Реестр МСП ФНС от ${new Date(searchResponse.sourceDate ?? searchResponse.searchedAt).toLocaleDateString('ru-RU')}, ${searchResponse.scoringMode === 'factual' ? 'расчёт по фактам без AI' : 'индекс с GigaChat'}. Основной оптовый ОКВЭД 46.2–46.9; наличие полевой команды требует проверки.`
                 : searchResponse.mode === 'snapshot'
                   ? `Снимок Rusprofile от ${new Date(searchResponse.sourceDate ?? searchResponse.searchedAt).toLocaleDateString('ru-RU')}, AI-оценка GigaChat. Охват: 17 регионов.`
                   : 'Демо-данные'}</p>
@@ -178,7 +173,7 @@ export function ScoutPage() {
       ) : (
         <section className="presearch-state">
           <div className="presearch-state__grid">
-            <div><span>01</span><h3>{isLiveMode ? 'Реестр ФНС' : 'Демо-данные'}</h3><p>{isLiveMode ? 'Юридические лица с профильным ОКВЭД из датированного набора открытых данных.' : 'Синтетические компании для знакомства с интерфейсом.'}</p></div>
+            <div><span>01</span><h3>{isLiveMode ? 'Реестр ФНС' : 'Демо-данные'}</h3><p>{isLiveMode ? 'Юридические лица и ИП с профильным ОКВЭД из датированного набора открытых данных.' : 'Синтетические компании для знакомства с интерфейсом.'}</p></div>
             <div><span>02</span><h3>{isLiveMode ? 'Подтверждённые данные' : 'Сценарий продаж'}</h3><p>{isLiveMode ? 'Регион, вид деятельности и сведения о масштабе компании.' : 'Пример признаков для разговора с клиентом.'}</p></div>
             <div><span>03</span><h3>{isLiveMode ? 'AI-приоритет' : 'Демо-рейтинг'}</h3><p>Объяснимый индекс от 0 до 100.</p></div>
           </div>

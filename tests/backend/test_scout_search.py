@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from api.scout.search import _grounded_score, app
+from api.scout.search import _candidate, _grounded_score, app
 from server.config import get_settings
 
 
@@ -53,12 +53,13 @@ class ScoutSearchTests(unittest.TestCase):
         self.assertEqual(body["companies"][0]["status"], "promising")
         self.assertEqual(body["companies"][0]["sources"][0]["category"], "registry")
 
-    def test_missing_ai_key_has_clear_configuration_error(self) -> None:
-        with patch.dict(os.environ, {"GIGACHAT_API_KEY": ""}):
+    def test_missing_ai_key_uses_labeled_factual_ranking(self) -> None:
+        with patch.dict(os.environ, {"GIGACHAT_API_KEY": "", "SCOUT_DATA_SOURCE": "fns", "SCOUT_BACKEND_URL": ""}):
             get_settings.cache_clear()
-            response = self.client.post("/api/scout/search", json={"region": "Москва"})
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json()["detail"], "AI-поиск ещё не настроен")
+            response = self.client.post("/api/scout/search", json={"region": "Москва", "limit": 2})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["scoringMode"], "factual")
+        self.assertIn("Расчёт приоритета", response.json()["companies"][0]["score"]["explanation"])
 
     def test_dated_snapshot_is_labeled_and_keeps_original_region(self) -> None:
         score = {
@@ -110,6 +111,19 @@ class ScoutSearchTests(unittest.TestCase):
         self.assertEqual(body["companies"][0]["sources"][0]["id"], "fns")
         self.assertIn("nalog.gov.ru", body["companies"][0]["sources"][0]["url"])
 
+    def test_ai_error_falls_back_to_factual_ranking(self) -> None:
+        from backend.gigachat import GigaChatError
+
+        with (
+            patch.dict(os.environ, {"GIGACHAT_API_KEY": "test-key", "SCOUT_DATA_SOURCE": "fns", "SCOUT_BACKEND_URL": ""}),
+            patch("backend.gigachat.GigaChatScorer.score", new_callable=AsyncMock, side_effect=GigaChatError("unavailable")),
+        ):
+            get_settings.cache_clear()
+            response = self.client.post("/api/scout/search", json={"region": "Москва", "limit": 2})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["scoringMode"], "factual")
+        self.assertEqual(response.json()["total"], 2)
+
     def test_grounded_ai_priority_varies_with_verified_company_data(self) -> None:
         model_score = {"value": 75}
         small_wholesaler = {
@@ -125,6 +139,24 @@ class ScoutSearchTests(unittest.TestCase):
         self.assertGreater(high["value"], low["value"])
         self.assertLess(high["value"], 80)
         self.assertIn("не подтверждены", high["explanation"])
+
+    def test_support_registry_adds_second_source_without_increasing_score(self) -> None:
+        company = {
+            "catalogId": "ip-example", "entityType": "sole_proprietor", "name": "ИП Пример",
+            "region": "Москва", "inn": "", "supportRegistry": True,
+        }
+        without_support = _grounded_score({**company, "supportRegistry": False}, {"value": 60})
+        with_support = _grounded_score(company, {"value": 60})
+        self.assertEqual(with_support["value"], without_support["value"])
+        candidate = _candidate(
+            company, with_support, "2026-09-10T00:00:00+03:00", "registry",
+            "https://www.nalog.gov.ru/opendata/7707329152-rsmp/",
+            "https://www.nalog.gov.ru/opendata/7707329152-rsmppp/",
+            "2026-09-15T00:00:00+03:00",
+        )
+        self.assertEqual(candidate["id"], "ip-example")
+        self.assertEqual(candidate["entityType"], "sole_proprietor")
+        self.assertEqual(len(candidate["sources"]), 2)
 
     def test_empty_region_is_rejected(self) -> None:
         response = self.client.post("/api/scout/search", json={"region": ""})

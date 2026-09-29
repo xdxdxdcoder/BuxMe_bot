@@ -65,7 +65,7 @@ export function CompanyPage() {
       <div className="detail-layout">
         <div className="detail-main">
           <section className="detail-card score-story">
-            <div className="section-title"><div><p className="eyebrow">Почему компания подходит</p><h2>Сигналы высокого потенциала</h2></div><Sparkles size={21} /></div>
+            <div className="section-title"><div><p className="eyebrow">Почему стоит проверить</p><h2>Оценка приоритета</h2></div><Sparkles size={21} /></div>
             <p className="score-story__lead">{company.score.explanation}</p>
             <div className="reason-list">{company.reasons.map((reason, index) => <div key={reason}><span>0{index + 1}</span><p>{reason}</p></div>)}</div>
           </section>
@@ -83,17 +83,18 @@ export function CompanyPage() {
 
           <section className="detail-card">
             <div className="section-title"><div><p className="eyebrow">Прозрачность данных</p><h2>Источники</h2></div><Globe2 size={21} /></div>
-            <div className="source-list">{company.sources.map((source) => <div key={source.id}><div className="source-icon"><FileText size={18} /></div><div><strong>{source.title}</strong><span>Проверено {formatDate(source.checkedAt)}</span></div><span className="source-type">{source.category}</span></div>)}</div>
+            <div className="source-list">{company.sources.map((source) => <div key={source.id}><div className="source-icon"><FileText size={18} /></div><div><strong>{source.url ? <a href={source.url} target="_blank" rel="noreferrer">{source.title} <ExternalLink size={13} /></a> : source.title}</strong><span>Данные от {formatDate(source.checkedAt)}</span></div><span className="source-type">Реестр</span></div>)}</div>
           </section>
         </div>
 
         <aside className="detail-sidebar">
           <section className="detail-card contact-card">
             <p className="eyebrow">Реквизиты и контакты</p>
-            <div className="contact-row"><span><Building2 size={17} /> ИНН</span><button type="button" onClick={() => copyText(company.inn)}>{company.inn} <Copy size={14} /></button></div>
-            <div className="contact-row"><span><Phone size={17} /> Телефон</span><button type="button" onClick={() => copyText(company.phone)}>{company.phone} <Copy size={14} /></button></div>
-            <div className="contact-row"><span><Mail size={17} /> Email</span><button type="button" onClick={() => copyText(company.email)}>{company.email} <Copy size={14} /></button></div>
-            <div className="contact-row"><span><Globe2 size={17} /> Сайт</span><button type="button" onClick={() => maxBridge.openExternal(company.website)}>Открыть <ExternalLink size={14} /></button></div>
+            {company.inn ? <div className="contact-row"><span><Building2 size={17} /> ИНН</span><button type="button" onClick={() => copyText(company.inn)}>{company.inn} <Copy size={14} /></button></div> : null}
+            {company.phone ? <div className="contact-row"><span><Phone size={17} /> Телефон</span><button type="button" onClick={() => copyText(company.phone)}>{company.phone} <Copy size={14} /></button></div> : null}
+            {company.email ? <div className="contact-row"><span><Mail size={17} /> Email</span><button type="button" onClick={() => copyText(company.email)}>{company.email} <Copy size={14} /></button></div> : null}
+            {company.website ? <div className="contact-row"><span><Globe2 size={17} /> Сайт</span><button type="button" onClick={() => maxBridge.openExternal(company.website)}>Открыть <ExternalLink size={14} /></button></div> : null}
+            {!company.inn && !company.phone && !company.email && !company.website ? <p className="section-description">Контакты в открытом наборе не указаны.</p> : null}
           </section>
           <section className="detail-card status-card">
             <label htmlFor="company-status">Статус работы</label>

@@ -23,6 +23,7 @@ class MockScoutService implements ScoutService {
       hasMore: (request.offset ?? 0) + (request.limit ?? 12) < MOCK_COMPANIES.length,
       searchedAt: new Date().toISOString(),
       mode: 'mock',
+      scoringMode: 'mock',
     };
   }
 }

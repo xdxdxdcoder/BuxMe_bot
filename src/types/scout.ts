@@ -18,6 +18,7 @@ export interface CompanySource {
 
 export interface Company {
   id: string;
+  entityType?: 'legal_entity' | 'sole_proprietor';
   name: string;
   region: string;
   city?: string;
@@ -52,6 +53,7 @@ export interface SearchResponse {
   hasMore: boolean;
   searchedAt: string;
   mode: 'mock' | 'live' | 'snapshot' | 'registry';
+  scoringMode?: 'giga' | 'factual' | 'mock';
   sourceDate?: string | null;
 }
 

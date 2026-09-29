@@ -49,8 +49,12 @@ paths:
     post:
       summary: Поиск и AI-оценка компаний по региону
       description: >-
-        Получает профильные юридические лица из датированного открытого реестра МСП
-        ФНС и оценивает приоритет проверки с помощью GigaChat. Поддерживает страницы.
+        Получает юридические лица и ИП с основным оптовым ОКВЭД 46.2–46.9 из
+        датированного открытого реестра МСП ФНС. Для юрлиц нужна численность
+        не менее пяти сотрудников по данным за 2025 год. Совпадение с реестром
+        получателей поддержки МСП отображается отдельным источником, но не
+        повышает индекс. GigaChat оценивает приоритет; при недоступности AI
+        использует расчёт по подтверждённым полям. Поддерживает страницы.
         Оценка не является вероятностью покупки. Полнота списка не гарантируется.
       requestBody:
         required: true
@@ -82,7 +86,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [requestId, region, companies, total, availableTotal, offset, hasMore, searchedAt, mode]
+                required: [requestId, region, companies, total, availableTotal, offset, hasMore, searchedAt, mode, scoringMode]
                 properties:
                   requestId: {type: string}
                   region: {type: string}
@@ -96,16 +100,17 @@ paths:
                   hasMore: {type: boolean}
                   searchedAt: {type: string, format: date-time}
                   mode: {type: string, enum: [registry, live, snapshot]}
+                  scoringMode: {type: string, enum: [giga, factual]}
                   sourceDate:
                     type: [string, 'null']
                     format: date-time
-                    description: Дата выпуска набора ФНС или снимка Rusprofile.
+                    description: Дата выпуска основного набора ФНС или снимка Rusprofile. Дополнительные источники имеют собственную дату в карточке.
         '422':
           description: Некорректный регион или лимит
         '502':
           description: Ошибка внешнего источника, AI-сервиса или Docker-бэкенда
         '503':
-          description: Живой поиск ещё не настроен
+          description: Сервер поиска ещё не настроен
 components:
   schemas:
     Company:
@@ -113,6 +118,7 @@ components:
       required: [id, name, region, score, signals, reasons, sources, status]
       properties:
         id: {type: string}
+        entityType: {type: string, enum: [legal_entity, sole_proprietor]}
         name: {type: string}
         region: {type: string}
         city: {type: string}
