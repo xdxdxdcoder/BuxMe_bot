@@ -11,7 +11,8 @@ from uuid import uuid4
 
 import httpx
 from fastapi import FastAPI, HTTPException, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from api.auth.max import AuthRequest, EmployeeResponse, authenticate
@@ -19,6 +20,10 @@ from server.config import get_settings
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Buxme AI-Scout", docs_url="/docs", redoc_url=None)
+DIST_DIR = Path(__file__).resolve().parents[2] / "dist"
+if DIST_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
+    app.mount("/brand", StaticFiles(directory=DIST_DIR / "brand"), name="brand")
 VERIFIED_CONTACTS = {
     # Public contact of the company, checked against its official website.
     "2225147567": {
@@ -205,9 +210,16 @@ def _candidate(
     }
 
 
-@app.get("/")
+@app.get("/healthz")
 async def healthcheck() -> dict[str, str]:
     return {"status": "ok", "service": "buxme-ai-scout"}
+
+
+@app.get("/", response_model=None)
+async def index() -> FileResponse | dict[str, str]:
+    if (DIST_DIR / "index.html").is_file():
+        return FileResponse(DIST_DIR / "index.html")
+    return await healthcheck()
 
 
 @app.post("/")
@@ -327,3 +339,10 @@ async def search_companies(
         "scoringMode": scoring_mode,
         "sourceDate": source_date,
     }
+
+
+@app.get("/{path:path}")
+async def spa_fallback(path: str) -> FileResponse:
+    if path.startswith("api/") or not (DIST_DIR / "index.html").is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(DIST_DIR / "index.html")

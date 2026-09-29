@@ -18,7 +18,7 @@ class Settings(BaseSettings):
         alias="MAX_BOT_USERNAME",
     )
     mini_app_url: str = Field(
-        default="https://bux-me-bot.vercel.app/",
+        default="https://buxme-scout-backend.onrender.com/",
         alias="MINI_APP_URL",
     )
     gigachat_api_key: SecretStr = Field(default=SecretStr(""), alias="GIGACHAT_API_KEY")
