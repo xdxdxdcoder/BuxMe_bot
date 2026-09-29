@@ -75,7 +75,7 @@ def _grounded_score(
     value = min(79, round(0.45 * score["value"] + 0.55 * evidence)) if ai_used else min(79, evidence)
     signals = [
         (
-            f"ОКВЭД 46.45 — {'основной' if primary else 'дополнительный'}"
+            f"ОКВЭД {company.get('okvedCode') or '46.45'} — {'основной' if primary else 'дополнительный'}"
             if activity in {"primary", "additional"}
             else f"Основной ОКВЭД {company.get('okvedCode', '')} — оптовая торговля"
         ),
@@ -90,7 +90,11 @@ def _grounded_score(
         signals.append("Есть запись в реестре получателей поддержки МСП ФНС")
     signals.append(f"Регион: {company['region']}")
     code = company.get("okvedCode", "")
-    profile = f"основной оптовый ОКВЭД {code}" if code else "оптовый профиль"
+    profile = (
+        f"основной ОКВЭД {code} — оптовая торговля парфюмерией и косметикой"
+        if code in {"46.45", "46.45.1"}
+        else f"основной оптовый ОКВЭД {code}" if code else "оптовый профиль"
+    )
     team = (
         f"Среднесписочная численность за 2025 год — {employees}. "
         if company.get("employeesCount") is not None else

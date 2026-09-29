@@ -58,14 +58,10 @@ def _company(doc: ET.Element, region_names: list[str]) -> dict[str, object] | No
     if primary is None:
         return None
     primary_code = primary.get("КодОКВЭД", "")
-    is_primary = primary_code.startswith("46.45")
-    is_wholesale = primary_code.startswith("46.") and not primary_code.startswith("46.1")
-    has_additional = any(
-        activity.get("КодОКВЭД", "").startswith("46.45")
-        for activity in activities.findall("СвОКВЭДДоп")
-    )
-    # Main wholesale activity is a verifiable distribution signal. Retail and agents are excluded.
-    if not is_wholesale:
+    # Buxme sells men's cosmetics to salons and barbershops. A secondary 46.45
+    # code on a fish or construction wholesaler does not establish a fit.
+    # 46.45.2 is soap-only, so it is outside this cosmetics prospect list.
+    if primary_code not in {"46.45", "46.45.1"}:
         return None
     employees_raw = doc.get("ССЧР", "")
     # For legal entities, keep those with an observed team rather than nominal zero-person firms.
@@ -111,7 +107,7 @@ def _company(doc: ET.Element, region_names: list[str]) -> dict[str, object] | No
         "city": city,
         "okvedCode": primary_code,
         "okved_descr": primary.get("НаимОКВЭД", ""),
-        "targetActivity": "primary" if is_primary else "additional" if has_additional else "wholesale",
+        "targetActivity": "primary",
         "employeesCount": int(employees_raw) if employees_raw.isdigit() else None,
         "employeesYear": 2025 if employees_raw.isdigit() else None,
         "mspCategory": CATEGORY.get(doc.get("КатСубМСП", ""), ""),
@@ -207,7 +203,7 @@ def build(archive: Path, *, support_archive: Path | None = None, check_hash: boo
         "supportArchiveUrl": SUPPORT_ARCHIVE_URL if support_archive is not None else None,
         "supportReleasedAt": SUPPORT_RELEASED_AT if support_archive is not None else None,
         "supportMatches": support_matches,
-        "selection": f"Основной оптовый ОКВЭД 46.2–46.9; для юрлиц не менее 5 сотрудников за 2025 год; не более {MAX_PER_REGION} на территорию",
+        "selection": f"Основной ОКВЭД 46.45 или 46.45.1 (косметика и парфюмерия, без торговли только мылом); для юрлиц не менее 5 сотрудников за 2025 год; не более {MAX_PER_REGION} на территорию",
         "availableByRegion": dict(sorted(available.items())),
         "companies": selected,
     }

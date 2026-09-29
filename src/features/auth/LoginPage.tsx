@@ -51,7 +51,7 @@ export function LoginPage() {
         <div className="login-panel__body">
           <p className="eyebrow">Платформа Buxme</p>
           <h1>Интеллектуальный поиск потенциальных клиентов</h1>
-          <p className="lead">AI-Scout находит оптовые компании и ИП, показывает подтверждённые признаки и помогает выбрать, кого проверить первым.</p>
+          <p className="lead">AI-Scout находит оптовых продавцов косметики и парфюмерии, показывает подтверждённые признаки и помогает выбрать, кого проверить первым.</p>
           <form onSubmit={handleSubmit} noValidate>
             <label className="field-label" htmlFor="employee-code">Код сотрудника</label>
             <div className={`input-wrap ${error ? 'input-wrap--error' : ''}`}>

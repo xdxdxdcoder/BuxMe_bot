@@ -106,8 +106,8 @@ export function ScoutPage() {
       <section className="hero-search">
         <div className="hero-search__copy">
           <span className="live-pill"><span /> AI-powered lead discovery</span>
-          <h1>Находим оптовые компании<br /><em>для проверки</em></h1>
-          <p>Показываем зарегистрированные компании и ИП с оптовым профилем и подсказываем, кого проверить в первую очередь.</p>
+          <h1>Находим дистрибьюторов косметики<br /><em>для проверки</em></h1>
+          <p>Показываем компании и ИП с основным ОКВЭД оптовой торговли косметикой и подсказываем, кого проверить в первую очередь.</p>
         </div>
         <form className="search-box" onSubmit={handleSearch} noValidate>
           <label htmlFor="region">Регион или город</label>
@@ -132,7 +132,7 @@ export function ScoutPage() {
               <p>Регион: {searchResponse.region} · {searchResponse.mode === 'live'
                 ? 'Актуальные данные Rusprofile, AI-оценка GigaChat'
                 : searchResponse.mode === 'registry'
-                  ? `Реестр МСП ФНС от ${new Date(searchResponse.sourceDate ?? searchResponse.searchedAt).toLocaleDateString('ru-RU')}, ${searchResponse.scoringMode === 'factual' ? 'расчёт по фактам без AI' : 'индекс с GigaChat'}. Основной оптовый ОКВЭД 46.2–46.9; наличие полевой команды требует проверки.`
+                  ? `Реестр МСП ФНС от ${new Date(searchResponse.sourceDate ?? searchResponse.searchedAt).toLocaleDateString('ru-RU')}, ${searchResponse.scoringMode === 'factual' ? 'расчёт по фактам без AI' : 'индекс с GigaChat'}. Основной ОКВЭД 46.45/46.45.1 — оптовая торговля косметикой и парфюмерией. Ассортимент, каналы продаж и наличие полевой команды требуют проверки.`
                 : searchResponse.mode === 'snapshot'
                   ? `Снимок Rusprofile от ${new Date(searchResponse.sourceDate ?? searchResponse.searchedAt).toLocaleDateString('ru-RU')}, AI-оценка GigaChat. Охват: 17 регионов.`
                   : 'Демо-данные'}</p>

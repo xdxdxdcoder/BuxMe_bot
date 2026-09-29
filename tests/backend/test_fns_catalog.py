@@ -13,6 +13,7 @@ class FnsCatalogTests(unittest.TestCase):
     def test_checked_in_catalog_supports_regions_cities_and_pages(self) -> None:
         catalog = load_fns_catalog()
         self.assertGreater(len(catalog["companies"]), 1000)
+        self.assertTrue(all(company["okvedCode"] in {"46.45", "46.45.1"} for company in catalog["companies"]))
         parser = Parser()
         first, total = parser.parse_fns_catalog("Москва", limit=12)
         second, next_total = parser.parse_fns_catalog("Москва", limit=12, offset=12)
@@ -30,14 +31,13 @@ class FnsCatalogTests(unittest.TestCase):
         _page, alternate_total = parser.parse_fns_catalog("Кемеровская область — Кузбасс")
         self.assertEqual(canonical_total, alternate_total)
 
-    def test_all_listed_regions_have_searchable_pages(self) -> None:
+    def test_all_listed_regions_return_only_local_cosmetics_pages(self) -> None:
         locations = Path(__file__).resolve().parents[2] / "src/data/russian-locations.json"
         regions = json.loads(locations.read_text(encoding="utf-8"))["regions"]
         parser = Parser()
         for region in regions:
             with self.subTest(region=region):
                 page, total = parser.parse_fns_catalog(region, limit=2)
-                self.assertGreater(total, 0)
                 self.assertEqual(len(page), min(2, total))
                 self.assertTrue(all(item["region"] == region for item in page))
 
@@ -73,16 +73,28 @@ class FnsCatalogTests(unittest.TestCase):
         self.assertTrue(company["catalogId"].startswith("ip-"))
         self.assertNotIn("123456789012", str(company))
 
-    def test_keeps_wholesale_team_and_excludes_retail_or_empty_legal_entity(self) -> None:
+    def test_requires_primary_cosmetics_not_food_construction_or_soap(self) -> None:
         def record(code: str, employees: int) -> ET.Element:
             return ET.fromstring(f'''<Документ ССЧР="{employees}">
               <ОргВклМСП НаимОргСокр="ООО Пример" ИННЮЛ="1234567890"/>
               <СведМН><Регион Наим="Ростовская"/></СведМН>
               <СвОКВЭД><СвОКВЭДОсн КодОКВЭД="{code}" НаимОКВЭД="Оптовая торговля"/></СвОКВЭД>
             </Документ>''')
-        self.assertEqual(_company(record("46.33", 8), ["Ростовская область"])["targetActivity"], "wholesale")
-        self.assertIsNone(_company(record("47.75", 8), ["Ростовская область"]))
-        self.assertIsNone(_company(record("46.33", 0), ["Ростовская область"]))
+        self.assertEqual(_company(record("46.45.1", 8), ["Ростовская область"])["targetActivity"], "primary")
+        for code in ("46.33", "46.73.6", "46.45.2", "47.75"):
+            self.assertIsNone(_company(record(code, 8), ["Ростовская область"]))
+        self.assertIsNone(_company(record("46.45", 0), ["Ростовская область"]))
+
+    def test_secondary_cosmetics_code_does_not_admit_unrelated_primary_business(self) -> None:
+        doc = ET.fromstring('''<Документ ССЧР="20">
+          <ОргВклМСП НаимОргСокр="ООО Рыба" ИННЮЛ="1234567890"/>
+          <СведМН><Регион Наим="Самарская"/></СведМН>
+          <СвОКВЭД>
+            <СвОКВЭДОсн КодОКВЭД="46.38" НаимОКВЭД="Рыба"/>
+            <СвОКВЭДДоп КодОКВЭД="46.45"/>
+          </СвОКВЭД>
+        </Документ>''')
+        self.assertIsNone(_company(doc, ["Самарская область"]))
 
     def test_support_records_match_business_without_exposing_ip_id(self) -> None:
         legal = ET.fromstring('<Документ><СвЮЛ ИННЮЛ="1234567890"/></Документ>')
