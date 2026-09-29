@@ -7,8 +7,10 @@ info:
     Ключ GigaChat необязателен; без него работает расчёт по фактам.
     Оценки являются рекомендациями, а не официальными сведениями.
 servers:
+  - url: https://bux-me-bot.vercel.app
+    description: Исходный адрес Mini App и API
   - url: https://buxme-scout-backend.onrender.com
-    description: Текущий публичный адрес Mini App и API
+    description: Резервный адрес и сервер AI-оценки
 paths:
   /api/auth/max:
     post:

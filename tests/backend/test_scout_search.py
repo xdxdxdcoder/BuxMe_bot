@@ -4,6 +4,7 @@ import unittest
 import os
 from unittest.mock import AsyncMock, patch
 
+import httpx
 from fastapi.testclient import TestClient
 
 from api.scout.search import _candidate, _grounded_score, app
@@ -201,6 +202,33 @@ class ScoutSearchTests(unittest.TestCase):
         self.assertEqual(backend.url, "https://backend.example/api/scout/search")
         self.assertEqual(backend.payload["region"], "Москва")
         self.assertEqual(response.json()["mode"], "live")
+
+    def test_vercel_link_uses_ai_backend_without_changing_public_url(self) -> None:
+        backend = AsyncMock()
+        backend.post.return_value = type("BackendResponse", (), {
+            "status_code": 200,
+            "json": lambda _self: {"mode": "registry", "scoringMode": "giga", "companies": [], "total": 0},
+        })()
+        backend.__aenter__.return_value = backend
+        with (
+            patch.dict(os.environ, {"VERCEL": "1", "SCOUT_BACKEND_URL": "", "SCOUT_DATA_SOURCE": "fns"}),
+            patch("api.scout.search.httpx.AsyncClient", return_value=backend),
+        ):
+            get_settings.cache_clear()
+            response = self.client.post("/api/scout/search", json={"region": "Москва"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["scoringMode"], "giga")
+        self.assertEqual(backend.post.call_args.args[0], "https://buxme-scout-backend.onrender.com/api/scout/search")
+
+    def test_vercel_search_falls_back_if_ai_backend_unavailable(self) -> None:
+        with (
+            patch.dict(os.environ, {"VERCEL": "1", "SCOUT_BACKEND_URL": "", "SCOUT_DATA_SOURCE": "fns", "GIGACHAT_API_KEY": ""}),
+            patch("api.scout.search.httpx.AsyncClient", side_effect=httpx.ConnectError("unavailable")),
+        ):
+            get_settings.cache_clear()
+            response = self.client.post("/api/scout/search", json={"region": "Москва", "limit": 1})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["scoringMode"], "factual")
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -232,24 +233,33 @@ async def search_companies(
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     settings = get_settings()
-    # The dated FNS catalog is bundled with the function; a sleeping remote
-    # proxy would only delay the primary user scenario.
-    if settings.scout_backend_url and settings.scout_data_source != "fns":
+    # Keep the already bound Vercel URL usable while the Render service performs
+    # GigaChat scoring. The bundled FNS catalog remains a fallback if Render
+    # is sleeping or unavailable.
+    proxy_url = settings.scout_backend_url
+    if not proxy_url and os.getenv("VERCEL") and settings.scout_data_source == "fns":
+        proxy_url = "https://buxme-scout-backend.onrender.com"
+    if proxy_url:
         try:
-            async with httpx.AsyncClient(timeout=180.0) as client:
+            async with httpx.AsyncClient(timeout=75.0) as client:
                 backend_response = await client.post(
-                    f"{settings.scout_backend_url.rstrip('/')}/api/scout/search",
+                    f"{proxy_url.rstrip('/')}/api/scout/search",
                     json=request.model_dump(),
                 )
+            if backend_response.status_code != 200:
+                raise ValueError(f"backend status {backend_response.status_code}")
             payload = backend_response.json()
         except (httpx.RequestError, ValueError) as exc:
-            logger.error("Scout backend proxy failed: %s", type(exc).__name__)
-            raise HTTPException(status_code=502, detail="Сервер поиска недоступен") from exc
-        return JSONResponse(
-            status_code=backend_response.status_code,
-            content=payload,
-            headers={"Cache-Control": "no-store"},
-        )
+            if settings.scout_data_source != "fns":
+                logger.error("Scout backend proxy failed: %s", type(exc).__name__)
+                raise HTTPException(status_code=502, detail="Сервер поиска недоступен") from exc
+            logger.warning("AI backend unavailable, using bundled FNS catalog: %s", type(exc).__name__)
+        else:
+            return JSONResponse(
+                status_code=backend_response.status_code,
+                content=payload,
+                headers={"Cache-Control": "no-store"},
+            )
 
     try:
         from backend.gigachat import GigaChatError, GigaChatScorer

@@ -1,6 +1,6 @@
 version: '1.0'
 solution: Buxme AI-Scout
-baseUrl: https://buxme-scout-backend.onrender.com
+baseUrl: https://bux-me-bot.vercel.app
 openapi: openapi.yaml
 notes: >-
   Проверка проводится с российского IP. При переносе на другой HTTPS-хостинг
